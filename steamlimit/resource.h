@@ -3,13 +3,17 @@
 // Used by monitor.rc
 //
 #define IDI_APPICON                     100
-#define IDS_APPTITLE                    100
-#define IDR_CONTEXTMENU                 105
+#define IDS_APPTITLE                    101
+#define IDR_CONTEXTMENU                 102
 #define ID_CONTEXT_SHOWSTEAM            32771
 #define ID_CONTEXT_AUTOSTART            32772
-#define ID_CONTEXT_SITE                 32773
-#define ID_CONTEXT_ENABLED              32774
+#define ID_CONTEXT_ABOUT                32773
+#define ID_CONTEXT_SITE                 32774
+#define ID_CONTEXT_ENABLED              32775
 #define ID_CONTEXT_EXIT                 32779
+#define IDD_ABOUT                       103
+#define IDC_APPNAME                     32780
+#define IDC_SITE                        32781
 
 // Next default values for new objects
 // 

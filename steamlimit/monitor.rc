@@ -114,8 +114,9 @@ IDR_CONTEXTMENU MENU
 BEGIN
     POPUP "Context"
     BEGIN
-        MENUITEM "Show &Steam Downloads",       ID_CONTEXT_SHOWSTEAM
+        MENUITEM "&Steam Downloads",            ID_CONTEXT_SHOWSTEAM
         MENUITEM "&Home page",                  ID_CONTEXT_SITE
+        MENUITEM "&About"                       ID_CONTEXT_ABOUT
         MENUITEM SEPARATOR
         MENUITEM "&Launch at Windows Login",    ID_CONTEXT_AUTOSTART, CHECKED
         MENUITEM "&Filter Content Servers",     ID_CONTEXT_ENABLED, CHECKED
@@ -124,6 +125,22 @@ BEGIN
     END
 END
 
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUT DIALOGEX 0, 0, 200, 30
+STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
+EXSTYLE WS_EX_TOOLWINDOW
+// CAPTION "About"
+FONT 10, "MS Shell Dlg"
+BEGIN
+    CONTROL "Steam Limiter 0.2.1", IDC_APPNAME, "Static", SS_CENTER, 0, 0, 200, 10
+    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Static", SS_CENTER, 0, 10, 200, 10
+    CONTROL "O&K", IDOK, "Button", BS_DEFPUSHBUTTON | BS_CENTER, 90, 20, 30, 10
+END
 
 /////////////////////////////////////////////////////////////////////////////
 //

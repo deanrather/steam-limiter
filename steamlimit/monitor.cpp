@@ -80,6 +80,12 @@ unsigned long   steamProcess;
 unsigned char   codeBytes [1024];
 
 /**
+ * If our "about" window is visible, the window should be here.
+ */
+
+HWND            aboutWindow;
+
+/**
  * Write a 32-bit value into the output in Intel byte order.
  */
 
@@ -651,6 +657,35 @@ void runCommand (const wchar_t * command) {
 }
 
 /**
+ * Dialog procedure for an "about" dialog.
+ *
+ * If I wanted to get fancy, I'd subclass the dialog and override WC_NCHITTEST
+ * but that's altogether too much work :-)
+ */
+
+INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
+                            LPARAM lparam) {
+        unsigned short  item = LOWORD (wparam);
+        unsigned short  code = HIWORD (wparam);
+
+        switch (message) {
+        case WM_COMMAND:
+                if (item != IDOK || code != BN_CLICKED)
+                        break;
+
+                DestroyWindow (window);
+                if (window == aboutWindow)
+                        aboutWindow = 0;
+                return true;
+
+        default:
+                break;
+        }
+
+        return FALSE;
+}
+
+/**
  * Window procedure for our basic window.
  */
 
@@ -667,6 +702,7 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
 
         case WM_NOTIFYICON:
                 switch (lparam) {
+                case WM_LBUTTONDOWN:
                 case WM_RBUTTONDOWN:
                         showContextMenu (window);
                         break;
@@ -707,6 +743,19 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
                          */
 
                         setAutostart ((info.fState & MFS_CHECKED) == 0);
+                        break;
+
+                case ID_CONTEXT_ABOUT:
+                        if (aboutWindow != 0) {
+                                SetFocus (aboutWindow);
+                                break;
+                        }
+
+                        aboutWindow = CreateDialogW (GetModuleHandle (0),
+                                                     MAKEINTRESOURCE (IDD_ABOUT),
+                                                     0, aboutProc);
+                        if (aboutWindow != 0)
+                                ShowWindow (aboutWindow, SW_SHOW);
                         break;
 
                 case ID_CONTEXT_ENABLED:
@@ -840,31 +889,43 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
         int             height;
         height = GetSystemMetrics (SM_CYCAPTION) * 2;
 
-        /**@todo Make the window name a resource. */
-        window = CreateWindowW (classDef.lpszClassName, L"Steam Monitor",
-                                style, 100, 100, 200, height, 0, 0, 0, 0);
-
-        if (window == 0)
-                return 1;
-
-#if     0
-        ShowWindow (window, SW_NORMAL);
-#endif
-
         /*
          * Register an icon for the system notification area.
          */
-        /**@todo make a string resource for the tip */
 
         NOTIFYICONDATA data = { sizeof (data) };
         data.hIcon = myIcon;
-        data.hWnd = window;
         data.uID = 0;
         data.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         data.uVersion = NOTIFYICON_VERSION;
         data.uCallbackMessage = WM_NOTIFYICON;
-        wcscpy_s (data.szTip, sizeof (data.szTip), L"Steam Content Server Limiter");
+        LoadStringW (instance, IDS_APPTITLE, data.szTip,
+                     ARRAY_LENGTH (data.szTip));
 
+        /*
+         * Use WS_EX_TOOLWINDOW to prevent the window showing up in the taskbar
+         * or ALT-TAB lists when active, and move it offscreen as well. This is
+         * useful to allow the window to be active when the content menu for
+         * the notification area icon is open, as TrackPopupMenu doesn't auto-
+         * close cleanly if the parent window isn't up and about.
+         *
+         * If the window is located on-screen at 0,0 then while minimized it'll
+         * also be under the taskbar, usually. But it still can potentially be
+         * visible, so the cleanest thing to do is to move it offscreen when it
+         * is being made visible for the menu.
+         */
+
+        window = CreateWindowExW (WS_EX_TOOLWINDOW, classDef.lpszClassName,
+                                  data.szTip, style, -100, - height,
+                                  200, height, 0, 0, 0, 0);
+
+        if (window == 0)
+                return 1;
+
+        ShowWindow (window, SW_NORMAL);
+        ShowWindow (window, SW_HIDE);
+        
+        data.hWnd = window;
         Shell_NotifyIconW (NIM_ADD, & data);
 
         /*
@@ -893,6 +954,11 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
                                 Shell_NotifyIconW (NIM_DELETE, & data);
                                 steamPoll (false);
                                 return 0;
+                        }
+
+                        if (aboutWindow != 0 &&
+                            IsDialogMessageW (aboutWindow, & message)) {
+                                continue;
                         }
 
                         TranslateMessage (& message);

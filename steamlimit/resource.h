@@ -10,11 +10,17 @@
 #define ID_CONTEXT_ABOUT                32773
 #define ID_CONTEXT_SITE                 32774
 #define ID_CONTEXT_ENABLED              32775
+#define ID_CONTEXT_SERVER               32776
 #define ID_CONTEXT_EXIT                 32779
 #define IDD_ABOUT                       103
 #define IDC_APPNAME                     32780
 #define IDC_SITE                        32781
 
+#define IDD_SERVERPICKER                104
+#define IDCB_PICKER                     32771
+
+#define IDS_SERVER0                     1000
+#define IDS_ADDRESS0                    2000
 // Next default values for new objects
 // 
 #ifdef APSTUDIO_INVOKED

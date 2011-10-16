@@ -1,6 +1,14 @@
 !include MUI.nsh
+!ifndef OutDir
+!define OutDir	"..\vs2010\release"
+!endif
 
-OutFile ..\vs2010\release\steamlimit-0.2.1.0.exe
+!searchparse /file ..\limitver.h "#define VER_MAJOR       " VER_MAJOR
+!searchparse /file ..\limitver.h "#define VER_MINOR       " VER_MINOR
+!searchparse /file ..\limitver.h "#define VER_BUILD       " VER_BUILD
+!searchparse /file ..\limitver.h "#define VER_REV         " VER_REV
+
+OutFile ${OutDir}\steamlimit-${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}.exe
 SetCompressor /SOLID lzma
 
 Name "Steam Content Server Limiter"
@@ -18,11 +26,11 @@ UninstPage Instfiles
 
 Icon ..\steamlimit\monitor.ico
 
-VIProductVersion "0.2.1.0"
+VIProductVersion "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "Steam Content Server Limiter"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "© Nigel Bree <nigel.bree@gmail.com>"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "FileDescription" "Steam Content Server Limiter Install"
-VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "0.2.1"
+VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}"
 
 Section
   IfFileExists $INSTDIR\steamlimit.exe 0 freshInstall
@@ -58,9 +66,9 @@ upgrade:
 replaceFiles:
   SetOutPath $INSTDIR
   WriteUninstaller $INSTDIR\uninst.exe
-  File ..\vs2010\release\steamlimit.exe
-  File ..\vs2010\release\steamfilter.dll
-  Exec "steamlimit.exe"
+  File ${OutDir}\steamlimit.exe
+  File ${OutDir}\steamfilter.dll
+  Exec "$INSTDIR\steamlimit.exe"
 SectionEnd
 
 Section "Uninstall"

@@ -183,6 +183,10 @@ int setFilter (wchar_t * address) {
                 scan = scan->ai_next;
         }
 
+        OutputDebugStringW (address);
+        OutputDebugStringA (scan == 0 ? " filter not resolved\n" :
+                            " filter installed");
+
         (* g_freeFunc) (result);
         return 1;
 }
@@ -236,7 +240,6 @@ STEAMDLL (int) SteamFilter (wchar_t * address) {
         g_freeFunc = (FreeAddrInfoWFunc) freeFunc;
 
         if (address != 0) {
-                OutputDebugStringW (address);
                 setFilter (address);
         }
 

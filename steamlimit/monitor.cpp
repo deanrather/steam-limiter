@@ -51,10 +51,16 @@
 wchar_t       * appPath;
 
 /**
+ * A string version of the application version.
+ */
+
+wchar_t       * appVer;
+
+/**
  * The IP of the server we wish to limit Steam to using.
  */
 
-wchar_t       * serverName = L"203.167.129.4";
+wchar_t       * serverName;
 
 /**
  * If filtering is (temporarily, anyway) currently disabled.
@@ -84,6 +90,12 @@ unsigned char   codeBytes [1024];
  */
 
 HWND            aboutWindow;
+
+/**
+ * If the server-picker window is visible, the window should be here.
+ */
+
+HWND            pickWindow;
 
 /**
  * Write a 32-bit value into the output in Intel byte order.
@@ -479,7 +491,7 @@ static  HWND            steam;
         if (proc == 0)
                 return;
 
-        if (attach && ! filterDisabled) {
+        if (serverName != 0 && attach && ! filterDisabled) {
                 callFilter (proc, "SteamFilter", serverName);
         } else
                 callFilter (proc, "FilterUnload");
@@ -686,6 +698,148 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
 }
 
 /**
+ * Create and show the "About" window.
+ */
+
+void showAbout (void) {
+        if (aboutWindow != 0) {
+                SetFocus (aboutWindow);
+                return;
+        }
+
+        aboutWindow = CreateDialogW (GetModuleHandle (0),
+                                     MAKEINTRESOURCE (IDD_ABOUT), 0, aboutProc);
+        if (aboutWindow == 0)
+                return;
+
+        wchar_t         text [1024];
+        GetDlgItemTextW (aboutWindow, IDC_APPNAME, text, ARRAY_LENGTH (text));
+
+        wcscat_s (text, ARRAY_LENGTH (text), L" ");
+        wcscat_s (text, ARRAY_LENGTH (text), appVer);
+
+        SetDlgItemTextW (aboutWindow, IDC_APPNAME, text);
+
+        ShowWindow (aboutWindow, SW_SHOW);
+}
+
+/**
+ * Dialog procedure for the server picker.
+ */
+
+INT_PTR CALLBACK pickProc (HWND window, UINT message, WPARAM wparam,
+                           LPARAM lparam) {
+        if (message != WM_COMMAND)
+                return FALSE;
+
+        unsigned short  item = LOWORD (wparam);
+        unsigned short  code = HIWORD (wparam);
+
+        if (code != BN_CLICKED)
+                return FALSE;
+
+        if (item != IDCANCEL) {
+                HWND            combo = GetDlgItem (window, IDCB_PICKER);
+                LRESULT         result;
+                result = SendMessage (combo, CB_GETCURSEL, 0, 0);
+
+                /*
+                 * If there's no selection, use the text in the edit control
+                 * as the IP or host address to actually filter. Otherwise map
+                 * the selection index to a string resource with the IP.
+                 */
+
+                wchar_t         text [1024];
+                if (result == CB_ERR) {
+                        GetWindowText (combo, text, ARRAY_LENGTH (text));
+                } else {
+                        LoadStringW (GetModuleHandle (0), IDS_ADDRESS0 + result,
+                                     text, ARRAY_LENGTH (text));
+                }
+
+
+                setSetting (LIMIT_SETTINGS, SERVER_VALUE, text);
+
+                if (serverName != 0)
+                        free (serverName);
+                serverName = wcsdup (text);
+
+                /*
+                 * Force the filter setting to be reapplied to any existing
+                 * active filter.
+                 */
+
+                steamProcess = 0;
+        }
+
+        DestroyWindow (window);
+        if (window == pickWindow)
+                pickWindow = 0;
+
+        return FALSE;
+}
+
+/**
+ * Show the server picker.
+ */
+
+void showPicker (void) {
+        if (pickWindow != 0) {
+                SetFocus (pickWindow);
+                return;
+        }
+
+        HMODULE         self = GetModuleHandle (0);
+        pickWindow = CreateDialogW (self, MAKEINTRESOURCE (IDD_SERVERPICKER),
+                                    0, pickProc);
+
+        if (pickWindow == 0)
+                return;
+
+        HWND            combo = GetDlgItem (pickWindow, IDCB_PICKER);
+
+        /*
+         * Add strings to the dialog's combo box
+         */
+
+        wchar_t         text [1024];
+        unsigned long   id = IDS_SERVER0;
+        unsigned long   defaultId = ~ 0UL;
+
+        for (;; ++ id) {
+                unsigned long   serverId = id - IDS_SERVER0 + IDS_ADDRESS0;
+                int             length;
+                length = LoadStringW (self, serverId,
+                                      text, ARRAY_LENGTH (text));
+                if (length == 0)
+                        break;
+
+                bool            isDefault = serverName != 0 &&
+                                            wcscmp (text, serverName) == 0;
+
+                length = LoadStringW (self, id, text, ARRAY_LENGTH (text));
+                if (length == 0)
+                        break;
+
+                LRESULT         result;
+                result = SendMessage (combo, CB_ADDSTRING, 0, (LPARAM) text);
+
+                if (result == CB_ERR)
+                        break;
+
+                if (isDefault)
+                        defaultId = result;
+        }
+
+        if (defaultId == ~ 0UL) {
+                SendMessage (combo, WM_SETTEXT, 0, (LPARAM) serverName);
+        } else
+                SendMessage (combo, CB_SETCURSEL, defaultId, 0);
+
+        ShowWindow (pickWindow, SW_SHOW);
+}
+
+/**
  * Window procedure for our basic window.
  */
 
@@ -746,16 +900,7 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
                         break;
 
                 case ID_CONTEXT_ABOUT:
-                        if (aboutWindow != 0) {
-                                SetFocus (aboutWindow);
-                                break;
-                        }
-
-                        aboutWindow = CreateDialogW (GetModuleHandle (0),
-                                                     MAKEINTRESOURCE (IDD_ABOUT),
-                                                     0, aboutProc);
-                        if (aboutWindow != 0)
-                                ShowWindow (aboutWindow, SW_SHOW);
+                        showAbout ();
                         break;
 
                 case ID_CONTEXT_ENABLED:
@@ -768,6 +913,10 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
                          */
 
                         setFilter ((info.fState & MFS_CHECKED) != 0);
+                        break;
+
+                case ID_CONTEXT_SERVER:
+                        showPicker ();
                         break;
 
                 default:
@@ -796,6 +945,31 @@ wchar_t * getAppPath (void) {
 
         appPath = (wchar_t *) malloc ((length + 1) * sizeof (wchar_t));
         wcscpy_s (appPath, length + 1, path);
+
+        /*
+         * While we're at it, extract the actual app version string.
+         */
+
+        unsigned long   handle = 0;
+        unsigned long   size = GetFileVersionInfoSize (appPath, & handle);
+
+        void          * mem = malloc (size);
+        GetFileVersionInfoW (appPath, handle, size, mem);
+
+        VS_FIXEDFILEINFO * info;
+        UINT            infoLength = 0;
+        VerQueryValueW (mem, L"\\", (void **) & info, & infoLength);
+
+        unsigned long   major = info->dwFileVersionMS >> 16;
+        unsigned long   minor = info->dwFileVersionMS & 0xFFFF;
+        unsigned long   build = info->dwFileVersionLS >> 16;
+
+        wsprintfW (path, L"%d.%d.%d", major, minor, build);
+
+        length = wcslen (path) + 1;
+        appVer = (wchar_t *) malloc (length * sizeof (wchar_t));
+        wcscpy_s (appVer, length, path);
+
         return appPath;
 }
 

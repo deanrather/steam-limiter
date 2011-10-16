@@ -5,6 +5,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "steamlimit", "steamlimit.vc
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "steamfilter", "steamfilter.vcxproj", "{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "build", "build.vcxproj", "{9C48C342-10C8-497B-BFBE-E92F52AA3673}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361} = {C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}
+		{8AA82AF8-EBFD-408E-A7FF-224C0A6E9193} = {8AA82AF8-EBFD-408E-A7FF-224C0A6E9193}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -19,6 +25,10 @@ Global
 		{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}.Debug|Win32.Build.0 = Debug|Win32
 		{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}.Release|Win32.ActiveCfg = Release|Win32
 		{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}.Release|Win32.Build.0 = Release|Win32
+		{9C48C342-10C8-497B-BFBE-E92F52AA3673}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9C48C342-10C8-497B-BFBE-E92F52AA3673}.Debug|Win32.Build.0 = Debug|Win32
+		{9C48C342-10C8-497B-BFBE-E92F52AA3673}.Release|Win32.ActiveCfg = Release|Win32
+		{9C48C342-10C8-497B-BFBE-E92F52AA3673}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

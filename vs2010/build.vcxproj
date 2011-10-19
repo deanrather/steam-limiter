@@ -13,6 +13,9 @@
   <ItemGroup>
     <None Include="..\install\setup.nsi" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\limitver.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9C48C342-10C8-497B-BFBE-E92F52AA3673}</ProjectGuid>
     <RootNamespace>steamfilter</RootNamespace>

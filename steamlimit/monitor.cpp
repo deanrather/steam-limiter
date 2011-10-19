@@ -1135,6 +1135,11 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
                                 continue;
                         }
 
+                        if (pickWindow != 0 &&
+                            IsDialogMessageW (pickWindow, & message)) {
+                                continue;
+                        }
+
                         TranslateMessage (& message);
                         DispatchMessage (& message);
                 }

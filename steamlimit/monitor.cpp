@@ -482,9 +482,24 @@ static  HWND            steam;
 
         steamProcess = processId;
 
+        /*
+         * Note that PROCESS_QUERY_INFORMATION below is necessary only for
+         * Windows 64-bit, as there's a bug in WOW64's emulation of some of the
+         * Win32 API's where they use that access instead (this bug exists in
+         * all the 64-bit editions of Windows since Windows Server 2003, and
+         * the CreateRemoteThread () documentation is an example of an API that
+         * was retrofitted to document this *after* the 64-bit editions of
+         * Windows released.
+         *
+         * [ I'd forgotten about that; about 8 years ago I was contacted by the
+         *   Microsoft AppCompat folks when they release Server 2003 64-bit and
+         *   our applications were affected by this bug in Windows. ]
+         */
+
         unsigned long   access;
         access = PROCESS_CREATE_THREAD | PROCESS_VM_OPERATION |
-                 PROCESS_VM_READ | PROCESS_VM_WRITE;
+                 PROCESS_VM_READ | PROCESS_VM_WRITE |
+                 PROCESS_QUERY_INFORMATION;
 
         HANDLE          proc;
         proc = OpenProcess (access, FALSE, steamProcess);
@@ -522,7 +537,7 @@ void setSetting (const wchar_t * path, const wchar_t * valueName,
                  const wchar_t * value) {
         HKEY            key;
         LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_LOCAL_MACHINE, path, 0, KEY_WRITE, & key);
+        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_WRITE, & key);
         if (result != ERROR_SUCCESS)
                 return;
 
@@ -541,7 +556,7 @@ void setSetting (const wchar_t * path, const wchar_t * valueName,
 bool testSetting (const wchar_t * path, const wchar_t * valueName) {
         HKEY            key;
         LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_LOCAL_MACHINE, path, 0, KEY_READ, & key);
+        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
         if (result != ERROR_SUCCESS)
                 return false;
 
@@ -559,7 +574,7 @@ bool testSetting (const wchar_t * path, const wchar_t * valueName) {
 wchar_t * getSetting (const wchar_t * path, const wchar_t * valueName) {
         HKEY            key;
         LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_LOCAL_MACHINE, path, 0, KEY_READ, & key);
+        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
         if (result != ERROR_SUCCESS)
                 return 0;
 

@@ -163,9 +163,11 @@ BEGIN
 
     IDS_SERVER0         "TelstraClear New Zealand"
     IDS_SERVER0 + 1     "Orcon New Zealand"
+    IDS_SERVER0 + 2     "Snap! New Zealand"
 
     IDS_ADDRESS0        "203.167.129.4"
     IDS_ADDRESS0 + 1    "219.88.241.90"
+    IDS_ADDRESS0 + 2    "202.124.127.66"
 END
 
 #endif    // English (United States) resources

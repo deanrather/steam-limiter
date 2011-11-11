@@ -454,38 +454,15 @@ void callFilter (HANDLE steam, const char * entryPoint, wchar_t * param = 0) {
 }
 
 /**
- * Poll for Steam application instances.
+ * Call into a filter DLL using a process ID.
  */
 
-void steamPoll (bool attach) {
-        /*
-         * Look for a Steam window.
-         */
-
-static  HWND            steam;
-        if (steam == 0) {
-                steam = FindWindowExW (0, 0, 0, L"Steam");
-                if (steam == 0)
-                        return;
-        }
-
-        /*
-         * See if the Window is still active or was created by the same process
-         * as the last known one, if any.
-         */
-
-        unsigned long   processId = 0;
-        GetWindowThreadProcessId (steam, & processId);
-
-        if (attach && processId == steamProcess)
-                return;
-
-        steamProcess = processId;
-
+void callFilterId (unsigned long processId, const char * entryPoint,
+                   wchar_t * param = 0) {
         /*
          * Note that PROCESS_QUERY_INFORMATION below is necessary only for
          * Windows 64-bit, as there's a bug in WOW64's emulation of some of the
-         * Win32 API's where they use that access instead (this bug exists in
+         * Win32 APIs where they use that access instead (this bug exists in
          * all the 64-bit editions of Windows since Windows Server 2003, and
          * the CreateRemoteThread () documentation is an example of an API that
          * was retrofitted to document this *after* the 64-bit editions of
@@ -506,12 +483,58 @@ static  HWND            steam;
         if (proc == 0)
                 return;
 
-        if (serverName != 0 && attach && ! filterDisabled) {
-                callFilter (proc, "SteamFilter", serverName);
-        } else
-                callFilter (proc, "FilterUnload");
+        /*
+         * Inject our shim page and call the desired entry point in the target
+         * DLL.
+         */
+
+        callFilter (proc, entryPoint, param);
 
         CloseHandle (proc);
+}
+
+/**
+ * Poll for Steam application instances.
+ *
+ * Originally this used FindWindowExW (), but this would sometimes cause a few
+ * problems due to unfortunate errors in the design of Windows itself; the find
+ * API, having brought a window handle into the process, will sometimes still
+ * continue to find a window even though it's long been closed (and the parent
+ * process is long-gone), and there's no obvious way to refresh the internal
+ * state of USER32.DLL to deal with this.
+ *
+ * The only practical alternative is to use EnumWindows ().
+ */
+
+void steamPoll (bool attach) {
+        /*
+         * Look for a Steam window.
+         */
+
+        HWND            steam = FindWindowExW (0, 0, 0, L"Steam");
+        if (steam == 0)
+                return;
+
+        /*
+         * See if the Window is still active or was created by the same process
+         * as the last known one, if any.
+         */
+
+        unsigned long   processId = 0;
+        unsigned long   threadId;
+        threadId = GetWindowThreadProcessId (steam, & processId);
+        if (threadId == 0 && processId == 0)
+                return;
+
+        if (attach && processId == steamProcess)
+                return;
+
+        steamProcess = processId;
+
+        if (serverName != 0 && attach && ! filterDisabled) {
+                callFilterId (steamProcess, "SteamFilter", serverName);
+        } else
+                callFilterId (steamProcess, "FilterUnload");
 }
 
 /**

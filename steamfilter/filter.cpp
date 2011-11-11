@@ -47,11 +47,29 @@
 #define STEAMDLL(type)  extern "C" __declspec (dllexport) type __stdcall
 
 /**
- * The prototype of the function we're hooking is:
+ * The prototype of the main function we're hooking is:
  *   int WSAAPI connect (SOCKET s, const struct sockaddr *name, int namelen);
  */
 
-typedef int (WSAAPI * ConnectFunc) (SOCKET S, const sockaddr * name, int namelen);
+typedef int (WSAAPI * ConnectFunc) (SOCKET s, const sockaddr * name, int namelen);
+
+/**
+ * The prototype of the legacy sockets DNS name lookup API is:
+ *   struct hostent * gethostbyname (const char * name);
+ *
+ * There are three functions that could be used for name resolution; this is
+ * the original BSD Sockets one, and as the oldest it uses a fixed buffer for
+ * the result that means no support at all for IPv6 is possible.
+ *
+ * The IETF-sanctioned replacement for this is getaddrinfo (), which is better
+ * (although still problematic to use, being completely synchronous like all
+ * the BSD socket APIs) and Microsoft have their own wide-character version for
+ * applications which want to explicitly use Unicode or UTF-8 encodings. Older
+ * applications written before IPv6 still tend to use gethostbyname (), so this
+ * is normally the one to filter.
+ */
+
+typedef struct hostent * (WSAAPI * GetHostFunc) (const char * name);
 
 /**
  * This is an assistant function in WS2_32.DLL we can use to parse a string
@@ -80,10 +98,16 @@ GetAddrInfoWFunc        g_addrFunc;
 FreeAddrInfoWFunc       g_freeFunc;
 
 /**
- * This is the original connect function, just past the patch bytes.
+ * This is the original connect () function, just past the patch area.
  */
 
-ConnectFunc     connectResume;
+ConnectFunc             g_connectResume;
+
+/**
+ * This is the original gethostbyname () function, just past the patch area.
+ */
+
+GetHostFunc             g_gethostResume;
 
 /**
  * Like htons () but as a macro.
@@ -104,8 +128,20 @@ unsigned char   want [4] = {
  * continue on to the original.
  */
 
-int __stdcall connectHook (SOCKET s, const sockaddr * name, int namelen) {
+int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
         sockaddr_in   * addr = (sockaddr_in *) name;
+
+        /*
+         * For now we just look for a single address and redirect connections
+         * to it if the port matches. Making this use multiple addresses is
+         * easy when allowing them to pass through, but more complex to use in
+         * picking one to detour to.
+         *
+         * As there's no real substantial benefit to supporting more than one
+         * at the moment (all New Zealand ISPs only use a single content server
+         * in any case) supporting multiple filters is not really worth it.
+         */
+
         if (namelen == sizeof (sockaddr_in) &&
             addr->sin_family == AF_INET &&
             addr->sin_port == SWAP (27030)) {
@@ -129,7 +165,97 @@ int __stdcall connectHook (SOCKET s, const sockaddr * name, int namelen) {
                 }
         }
                 
-        return (* connectResume) (s, name, namelen);
+        return (* g_connectResume) (s, name, namelen);
+}
+
+/**
+ * Ultra-simple glob matcher.
+ */
+
+bool globMatch (const char * example, const char * pattern) {
+        if (example == 0)
+                return false;
+
+        char            ch;
+        for (; (ch = * pattern) != 0 ; ++ pattern) {
+                if (ch == '?') {
+                        /*
+                         * Allow any character or the end of the example string
+                         * to match a '?'.
+                         */
+
+                        if (* example != 0)
+                                ++ example;
+
+                        continue;
+                } else if (ch != '*') {
+                        /*
+                         * Exact match on one character.
+                         */
+
+                        if (* example != ch)
+                                return false;
+
+                        ++ example;
+                        continue;
+                }
+
+                /*
+                 * Wildcard match, consume any number of characters. As in the
+                 * original UNIX v6 code, this is a fairly inefficient way of
+                 * implementing Kleene-type closure compared to any of the more
+                 * fun matching systems (Boyer-Moore, Knuth-Morris-Pratt, or
+                 * most forms of regular expression execution via compilation
+                 * to NFA/DFA/vm-code) but it's super-simple and as small code
+                 * size is part of the design goal, why not?
+                 */
+
+                for (;;) {
+                        /*
+                         * Start with a recursive call just on the example, so
+                         * that we permit 0 characters to match.
+                         */
+
+                        if (globMatch (example, pattern + 1))
+                                return true;
+
+                        if (* example == 0)
+                                return false;
+
+                        ++ example;
+                }
+        }
+        return * example == 0;
+}
+
+/**
+ * Hook for the gethostbyname () Sockets address-resolution function.
+ *
+ * This looks for a glob-type pattern to reject or accept the name resolution,
+ * and for now just says that it can't find a host. At some point I should add
+ * some function to configure the filter string, but for now it is what it is.
+ */
+
+struct hostent * WSAAPI gethostHook (const char * name) {
+        if (! globMatch (name, "content*.steampowered.com"))
+                return (* g_gethostResume) (name);
+
+        OutputDebugStringA (name);
+        OutputDebugStringA (" DNS result blocked\r\n");
+
+        /*
+         * On Windows, WSAGetLastError () and WSASetLastError () are
+         * just thin wrappers around GetLastError ()/SetLastError (),
+         * so we can use SetLastError ().
+         *
+         * Set up the right error number for a nonexistent host, since
+         * this classic BSD sockets API doesn't have a proper error
+         * reporting mechanism and that's what most code looks for to
+         * see what went wrong.
+         */
+
+        SetLastError (WSAHOST_NOT_FOUND);
+        return 0;
 }
 
 /**
@@ -153,6 +279,9 @@ unsigned char * writeOffset (unsigned char * dest, unsigned long value) {
 
 #define JMP_LONG        0xE9
 #define JMP_SHORT       0xEB
+
+#define MOV_EDI_EDI     0xFF8B
+#define JMP_SHORT_MINUS5 (0xF900 + JMP_SHORT)
 
 /**
  * Record our HMODULE value for unloading.
@@ -189,6 +318,68 @@ int setFilter (wchar_t * address) {
 
         (* g_freeFunc) (result);
         return 1;
+}
+
+/**
+ * Use the built-in Windows run-time patching system for core DLLs.
+ */
+
+bool attachHook (void * address, void * newTarget) {
+        /*
+         * Check for the initial MOV EDI, EDI two-byte NOP in the target
+         * function, to signify the presence of a free patch area.
+         *
+         * We'll rely on the x86's support for unaligned access here, as we're
+         * always going to be doing this on an x86 or something with equivalent
+         * support for unaligned access.
+         */
+
+        unsigned char * data = (unsigned char *) address;
+        if (* (unsigned short *) data != MOV_EDI_EDI) {
+                OutputDebugStringA ("SteamFilter: connect not patchable\n");
+                return false;
+        }
+
+        /*
+         * Write a branch to the hook stub over the initial NOP of the target
+         * function.
+         */
+
+        unsigned long   protect = 0;
+        if (! VirtualProtect (data - 5, 7, PAGE_EXECUTE_READWRITE, & protect))
+                return false;
+
+        /*
+         * Put the long jump to the detour first (in space which is reserved
+         * for just this purpose in code compiled for patching), then put the
+         * short branch to the long jump in the two-byte slot at the regular
+         * function entry point.
+         */
+
+        data [- 5] = JMP_LONG;
+        writeOffset (data - 4, (unsigned char *) newTarget - data);
+        * (unsigned short *) data = JMP_SHORT_MINUS5;
+        return true;
+}
+
+/**
+ * Remove an attached hook, based on the address past the detour point.
+ *
+ * In case the target DLL is actually unloaded, the write to the detour point
+ * is guarded with a Win32 SEH block to avoid problems with the writes.
+ */
+
+void unhook (void * resumeAddress) {
+        if (resumeAddress == 0)
+                return;
+
+        unsigned char * dest = (unsigned char *) resumeAddress - 2;
+
+        __try {
+                * (unsigned short *) dest = MOV_EDI_EDI;
+                memset (dest - 5, 0x90, 5);
+        } __finally {
+        }
 }
 
 /**
@@ -236,33 +427,39 @@ STEAMDLL (int) SteamFilter (wchar_t * address) {
         if (addrFunc == 0)
                 return 0;
 
+        FARPROC         gethostFunc = GetProcAddress (ws2, "gethostbyname");
+        if (gethostFunc == 0)
+                return 0;
+
         g_addrFunc = (GetAddrInfoWFunc) addrFunc;
         g_freeFunc = (FreeAddrInfoWFunc) freeFunc;
 
-        if (address != 0) {
+        if (address != 0)
                 setFilter (address);
-        }
 
-        unsigned char * data = (unsigned char *) connFunc;
-        if (data [0] != 0x8B && data [1] == 0xFF) {
+        /*
+         * Actually establish the diversion on the Windows Sockets connect ()
+         * function.
+         */
+
+        g_connectResume = (ConnectFunc) ((char *) connFunc + 2);
+        if (! attachHook (connFunc, connectHook)) {
                 OutputDebugStringA ("SteamFilter: connect not patchable\n");
                 return 0;
         }
 
-        /*
-        /*
-         * Write a breakpoint instruction over the top of the target function.
-         */
+        g_gethostResume = (GetHostFunc) ((char *) gethostFunc + 2);
+        if (! attachHook (gethostFunc, gethostHook)) {
+                /*
+                 * Back out the connect hook we just attached.
+                 */
 
-        unsigned long   protect = 0;
-        if (! VirtualProtect (data - 5, 7, PAGE_EXECUTE_READWRITE, & protect))
+                unhook (g_connectResume);
+                g_connectResume = 0;
+
+                OutputDebugStringA ("SteamFilter: gethostbyname not patchable\n");
                 return 0;
-
-        connectResume = (ConnectFunc) (data + 2);
-
-        data [- 5] = JMP_LONG;
-        writeOffset (data - 4, (unsigned char *) connectHook - data);
-        * (unsigned short *) data = 0xF9EB;
+        }
 
         OutputDebugStringA ("SteamFilter hook attached\n");
 
@@ -288,17 +485,14 @@ STEAMDLL (int) SteamFilter (wchar_t * address) {
  */
 
 void removeHook (void) {
-        if (connectResume == 0)
+        if (g_connectResume == 0)
                 return;
 
-        unsigned char * dest = (unsigned char *) connectResume - 2;
+        unhook (g_connectResume);
+        g_connectResume = 0;
 
-        __try {
-                * (unsigned short *) dest = 0xFF8B;
-                memset (dest - 5, 0x90, 5);
-        } __finally {
-                connectResume = 0;
-        }
+        unhook (g_gethostResume);
+        g_gethostResume = 0;
 
         OutputDebugStringA ("SteamFilter unhooked\n");
 }

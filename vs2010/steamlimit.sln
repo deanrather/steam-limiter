@@ -2,6 +2,9 @@
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual C++ Express 2010
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "steamlimit", "steamlimit.vcxproj", "{8AA82AF8-EBFD-408E-A7FF-224C0A6E9193}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361} = {C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "steamfilter", "steamfilter.vcxproj", "{C9B5CA16-06C9-4A3E-9E7F-0830A5FA7361}"
 EndProject

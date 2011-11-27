@@ -1,0 +1,36 @@
+application: steam-limiter
+version: 1
+runtime: python27
+threadsafe: true
+api_version: 1
+
+builtins:
+- remote_api: on
+
+libraries:
+- name: jinja2
+  version: latest
+- name: markupsafe                                                              
+  version: latest 
+
+handlers:
+- url: /favicon\.ico
+  static_files: favicon.ico
+  upload: favicon\.ico
+
+- url: /base\.css
+  static_files: base.css
+  upload: base\.css
+
+- url: .*
+  script: main.app
+
+skip_files:
+- ^(.*/)?app\.yaml
+- ^(.*/)?app\.yml
+- ^(.*/)?index\.yaml
+- ^(.*/)?index\.yml
+- ^(.*/)?.*\.py[co]
+- ^(.*/)?.*\.bat
+- ^(.*/)?.*\.js
+- ^(.*/)?.*\.csv

@@ -1,0 +1,58 @@
+<html>
+<head>
+<title>Steam Content Server Limiter</title>
+<link rel="stylesheet" type="text/css" href="base.css" />
+</head>
+
+<body>
+<div class="userinfo" id="userinfo">
+</div>
+
+<div class="about">
+
+<img class="icon" src="/favicon.ico"/>
+<h1>The Steam Content Limiter</h1>
+
+<p>This Google App Engine application provides a few small services for the
+benefit of the <a href="http://code.google.com/p/steam-limiter">Steam
+Content Server Limiter</a> application, a small helper for customers of
+ISPs which have strict bandwidth caps. The helper will force Steam to only
+download from ISP-provided servers to prevent Steam content being
+charged against the bandwidth cap.</p>
+
+<p>This kind of arrangement is common in Australia and New Zealand where
+the operating costs of the trans-oceanic fiber cables are borne by ISPs
+who then use data caps to manage the load their customers offer. Since
+Steam itself has no support for limiting which servers it downloads from,
+this third-party helper does the job.</p>
+
+<p>The services here for the Steam applet to use are:
+<ul>
+<li><a href="/latest">/latest</a> to show the most recent app version</li>
+<li><a href="/download">/download</a> to access the download page for the
+latest version</li>
+<li><a href="/ispname">/ispname</a> for a best guess at which supported
+ISP you are hosted on</li>
+<li><a href="/filterip">/filterip</a> which returns the content server IP
+matching the ISP reported in <a href="/ispname">/ispname</a></li>
+</ul>
+
+<p>These services are intended to allow the installer for the Steam Limiter
+to automatically determine which of the supported ISPs you are a customer
+of so that the correct filter is used by default, and to help the Limiter
+to automatically check for new versions and assist in downloading the
+installer for the latest version</p>
+
+<p>No personally identifiable information is retained by this service,
+although for the purposes of debugging the /ispname and /filterip services
+the external IP address of the visiting host is written to the App Engine
+administrative log (just as any webserver does).</p>
+
+<p>This service uses a subset of the <a href="http://www.maxmind.com/app/asnum">GeoLite data</a>
+created by MaxMind, available from <a href="http://www.maxmind.com">http://www.maxmind.com/</a>
+to determine which supported ISP you are visiting from.</p>
+
+</div>
+
+</body>
+</html>

@@ -5,3 +5,4 @@ vs2010/*.suo
 vs2010/*.user
 vs2010/*.*sdf
 vs2010/ipch/*
+*.pyc

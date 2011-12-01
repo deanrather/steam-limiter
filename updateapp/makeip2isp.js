@@ -29,7 +29,8 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ */
+/*
  * Simple Javascript script (for Windows Script Host) to convert the raw
  * GeoASN data from http://www.maxmind.com/app/asnum into a simple Python
  * literal for the ultra-simple mapping I want for my GAE service.

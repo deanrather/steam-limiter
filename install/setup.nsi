@@ -52,8 +52,8 @@ UninstPage UninstConfirm
 UninstPage Instfiles
 
 /*
- * For UAC-awareness, we ask the NSIS UAC plug-in to relauch a nested copy of
- * the installer elevated, which can then call back function fragments is it
+ * For UAC-awareness, we ask the NSIS UAC plug-in to relaunch a nested copy of
+ * the installer elevated, which can then call back function fragments as it
  * needs.
  *
  * This is per the UAC plugin wiki page, which is incorrect in most every other
@@ -87,11 +87,11 @@ Function .onInit
 FunctionEnd
 
 Function runProgram
-  Exec "$INSTDIR\steamlimit.exe"
+  Exec '"$INSTDIR\steamlimit.exe"'
 FunctionEnd
 
 Function quitProgram
-  ExecWait "$INSTDIR\steamlimit.exe -quit"
+  ExecWait '"$INSTDIR\steamlimit.exe" -quit'
 FunctionEnd
 
 Section
@@ -113,21 +113,57 @@ freshInstall:
                    "UninstallString" "$\"$INSTDIR\uninst.exe$\""
 
 upgrade:
-  /* See if there's a 3.0.0 setting inside HKLM */
-  ReadRegStr $0 HKCU "Software\SteamLimiter" "Server"
-  IfErrors 0 setServerValue
-
-  /* Set the default content server to limit to if not set. */
-  ReadRegStr $0 HKCU "Software\SteamLimiter" "Server"
-  IfErrors 0 replaceFiles
+  SetOutPath $INSTDIR
+  WriteUninstaller $INSTDIR\uninst.exe
+  File ${OutDir}\steamlimit.exe
+  File ${OutDir}\steamfilter.dll
+  File ..\scripts\setfilter.js
 
   /*
-   * This value is for TelstraClear; if I wanted to get fancy I'd have a menu
-   * page in the wizard for selecting alternatives, but I'm writing this for me
-   * to start with.
+   * Set the registry keys for the version options; from time to time we can
+   * check the webservice to see if an update is available. Writing the current
+   * version is a little redundant since it's in the monitor's resources, but
+   * that's not always convenient to dig out in e.g. an upgrade script so there
+   * seems little harm keeping another copy of the version string around.
    *
-   * From 0.3.0 onwards there is UI in the monitor program for this, so the
-   * installer can probably stay as-is.
+   * Of course, comparing *string* versions instead of *numeric* versions is
+   * not always ideal. Since this is my own personal project, let's just say
+   * that I'm expecting future me not to have to make that many distinct builds
+   * and to be able to offload data changes to a webservice.
+   */
+
+  WriteRegStr HKCU "Software\SteamLimiter" "LastVersion" \
+                   "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
+  WriteRegStr HKCU "Software\SteamLimiter" "NextVersion" \
+                   "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
+
+  /*
+   * See if there's a 0.3.0 filter setting inside HKLM - if so, move it to the
+   * HKCU key and launch the monitor app.
+   */
+
+  ReadRegStr $0 HKLM "Software\SteamLimiter" "Server"
+  IfErrors 0 setServerValue
+
+  /*
+   * See if there's an existing setting under HKCU - if so, preserve it and
+   * just move on to launching the monitor app.
+   */
+
+  ReadRegStr $0 HKCU "Software\SteamLimiter" "Server"
+  IfErrors 0 finishInstall
+
+  /*
+   * We don't have an existing setting - try and auto-configure the right
+   * one based on detecting the upstream ISP using a web service. There's
+   * a small script to do this which we can run (elevated if necessary).
+   */
+
+  ExecWait 'wscript "$INSTDIR\setfilter.js"'
+  IfErrors 0 finishInstall
+
+  /*
+   * This value is for TelstraClear; use it if we have to.
    */
 
   StrCpy $0 "203.167.129.4"
@@ -135,13 +171,8 @@ upgrade:
 setServerValue:
   WriteRegStr HKCU "Software\SteamLimiter" "Server" $0
 
-replaceFiles:
+finishInstall:
   DeleteRegKey HKLM "Software\SteamLimiter"
-
-  SetOutPath $INSTDIR
-  WriteUninstaller $INSTDIR\uninst.exe
-  File ${OutDir}\steamlimit.exe
-  File ${OutDir}\steamfilter.dll
   !insertmacro UAC_AsUser_Call Function runProgram ${UAC_SYNCINSTDIR}
 SectionEnd
 

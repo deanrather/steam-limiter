@@ -51,7 +51,7 @@
 wchar_t       * appPath;
 
 /**
- * A string version of the application version.
+ * A string version of the application version data.
  */
 
 wchar_t       * appVer;
@@ -96,6 +96,25 @@ HWND            aboutWindow;
  */
 
 HWND            pickWindow;
+
+/**
+ * The last known time that we checked for an upgraded version.
+ */
+
+ULONGLONG       upgradeCheckTime;
+
+/**
+ * How often to check for upgrades after being installed.
+ *
+ * This doesn't cause an in-your-face prompt, so more often than less is not
+ * likely to be harmful. The only potential drawback here would be for anyone
+ * on a dial-up connection. 20 or 30 days, maybe?
+ *
+ * This is based on a FILETIME, so 400ns is the basic "tick" aka 2.5 million,
+ * we'll put the number of days as the leftmost term.
+ */
+
+#define UPGRADE_CHECK_DELTA     (30 * 24 * 60 * 60 * 2500000ULL)
 
 /**
  * Write a 32-bit value into the output in Intel byte order.
@@ -494,50 +513,6 @@ void callFilterId (unsigned long processId, const char * entryPoint,
 }
 
 /**
- * Poll for Steam application instances.
- *
- * Originally this used FindWindowExW (), but this would sometimes cause a few
- * problems due to unfortunate errors in the design of Windows itself; the find
- * API, having brought a window handle into the process, will sometimes still
- * continue to find a window even though it's long been closed (and the parent
- * process is long-gone), and there's no obvious way to refresh the internal
- * state of USER32.DLL to deal with this.
- *
- * The only practical alternative is to use EnumWindows ().
- */
-
-void steamPoll (bool attach) {
-        /*
-         * Look for a Steam window.
-         */
-
-        HWND            steam = FindWindowExW (0, 0, 0, L"Steam");
-        if (steam == 0)
-                return;
-
-        /*
-         * See if the Window is still active or was created by the same process
-         * as the last known one, if any.
-         */
-
-        unsigned long   processId = 0;
-        unsigned long   threadId;
-        threadId = GetWindowThreadProcessId (steam, & processId);
-        if (threadId == 0 && processId == 0)
-                return;
-
-        if (attach && processId == steamProcess)
-                return;
-
-        steamProcess = processId;
-
-        if (serverName != 0 && attach && ! filterDisabled) {
-                callFilterId (steamProcess, "SteamFilter", serverName);
-        } else
-                callFilterId (steamProcess, "FilterUnload");
-}
-
-/**
  * The standard Windows shell key for application launch at login.
  */
 
@@ -551,6 +526,8 @@ void steamPoll (bool attach) {
 #define LIMIT_SETTINGS  L"Software\\" RUN_VALUE
 #define SERVER_VALUE    L"Server"
 #define DISABLE_VALUE   L"Disabled"
+#define VERSION_VALUE   L"NextVersion"
+#define TIMESTAMP_VALUE L"UpgradeCheck"
 
 /**
  * Common code for managing simple settings.
@@ -569,6 +546,28 @@ void setSetting (const wchar_t * path, const wchar_t * valueName,
                                 (wcslen (value) + 1) * sizeof (wchar_t));
         } else
                 RegDeleteValueW (key, valueName);
+
+        RegCloseKey (key);
+}
+
+/**
+ * Set a 64-bit value in the registry.
+ */
+
+void setValue (const wchar_t * path, const wchar_t * valueName,
+               ULONGLONG * value) {
+        HKEY            key;
+        LSTATUS         result;
+        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_WRITE, & key);
+        if (result != ERROR_SUCCESS)
+                return;
+
+        if (value != 0) {
+                RegSetValueExW (key, valueName, 0, REG_QWORD, (BYTE *) value,
+                                sizeof (* value));
+        } else
+                RegDeleteValueW (key, valueName);
+
         RegCloseKey (key);
 }
 
@@ -587,6 +586,8 @@ bool testSetting (const wchar_t * path, const wchar_t * valueName) {
         unsigned long   length;
         result = RegQueryValueExW (key, valueName, 0, & type, 0, & length);
 
+        RegCloseKey (key);
+
         return result == ERROR_SUCCESS && type == REG_SZ;
 }
 
@@ -604,12 +605,15 @@ wchar_t * getSetting (const wchar_t * path, const wchar_t * valueName) {
         unsigned long   type;
         unsigned long   length;
         result = RegQueryValueExW (key, valueName, 0, & type, 0, & length);
-        if (result != ERROR_SUCCESS || type != REG_SZ)
+        if (result != ERROR_SUCCESS || type != REG_SZ) {
+                RegCloseKey (key);
                 return 0;
+        }
 
         wchar_t       * value = (wchar_t *) malloc (length);
         result = RegQueryValueExW (key, valueName, 0, & type, (BYTE *) value,
                                    & length);
+        RegCloseKey (key);
 
         if (result == ERROR_SUCCESS)
                 return value;
@@ -618,6 +622,31 @@ wchar_t * getSetting (const wchar_t * path, const wchar_t * valueName) {
         return 0;
 }
 
+/**
+ * Retrieve a 64-bit value from the registry, defaulting to 0.
+ */
+
+ULONGLONG getValue (const wchar_t * path, const wchar_t * valueName) {
+        HKEY            key;
+        LSTATUS         result;
+        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
+        if (result != ERROR_SUCCESS)
+                return 0;
+
+        unsigned long   type;
+        ULONGLONG       value = 0;
+        unsigned long   length = sizeof (value);
+
+        ULONGLONG       data;
+        result = RegQueryValueExW (key, valueName, 0, & type, (BYTE *) & value,
+                                   & length);
+        RegCloseKey (key);
+
+        if (result == ERROR_SUCCESS && length == sizeof (value))
+                return value;
+
+        return 0;
+}
 
 /**
  * Set the monitor process to autostart, or disable it.
@@ -660,6 +689,78 @@ bool getFilter (void) {
 }
 
 /**
+ * Use ShellExecute to fire off a URL, especially for the steam:// URL scheme.
+ */
+
+void runCommand (const wchar_t * command, const wchar_t * parameters = 0) {
+        SHELLEXECUTEINFOW exec = { sizeof (exec) };
+        exec.lpFile = command;
+        exec.lpParameters = parameters;
+
+        /*
+         * Force the current directory to be the application directory.
+         */
+
+        wchar_t         path [1024];
+        wcscpy_s (path, ARRAY_LENGTH (path), appPath);
+
+        wchar_t       * end = wcsrchr (path, '\\');
+        if (end == 0)
+                return;
+        * end = 0;
+
+        exec.lpDirectory = path;
+        ShellExecuteExW (& exec);
+}
+
+/**
+ * Poll for Steam application instances.
+ *
+ * While we're at it, sometimes decide whether to check our webservice for
+ * updates.
+ */
+
+void steamPoll (bool attach) {
+        ULONGLONG       now;
+        GetSystemTimeAsFileTime ((FILETIME *) & now);
+
+        if (now - upgradeCheckTime > UPGRADE_CHECK_DELTA) {
+                upgradeCheckTime = now;
+                setValue (LIMIT_SETTINGS, TIMESTAMP_VALUE, & now);
+                runCommand (L"wscript.exe", L"setfilter.js");
+        }
+
+        /*
+         * Look for a Steam window.
+         */
+
+        HWND            steam = FindWindowExW (0, 0, 0, L"Steam");
+        if (steam == 0)
+                return;
+
+        /*
+         * See if the Window is still active or was created by the same process
+         * as the last known one, if any.
+         */
+
+        unsigned long   processId = 0;
+        unsigned long   threadId;
+        threadId = GetWindowThreadProcessId (steam, & processId);
+        if (threadId == 0 && processId == 0)
+                return;
+
+        if (attach && processId == steamProcess)
+                return;
+
+        steamProcess = processId;
+
+        if (serverName != 0 && attach && ! filterDisabled) {
+                callFilterId (steamProcess, "SteamFilter", serverName);
+        } else
+                callFilterId (steamProcess, "FilterUnload");
+}
+
+/**
  * Context menu for the system notification area icon.
  */
 
@@ -697,16 +798,6 @@ void showContextMenu (HWND window) {
 }
 
 /**
- * Use ShellExecute to fire off a URL, especially for the steam:// URL scheme.
- */
-
-void runCommand (const wchar_t * command) {
-        SHELLEXECUTEINFOW exec = { sizeof (exec) };
-        exec.lpFile = command;
-        ShellExecuteEx (& exec);
-}
-
-/**
  * Dialog procedure for an "about" dialog.
  *
  * If I wanted to get fancy, I'd subclass the dialog and override WC_NCHITTEST
@@ -720,12 +811,28 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
 
         switch (message) {
         case WM_COMMAND:
-                if (item != IDOK || code != BN_CLICKED)
+                switch (item) {
+                case IDOK:
+                case IDB_UPGRADE:
+                        if (code != BN_CLICKED)
+                                item = 0;
+                        break;
+
+                default:
+                        item = 0;
+                        break;
+                }
+
+                if (item == 0)
                         break;
 
                 DestroyWindow (window);
                 if (window == aboutWindow)
                         aboutWindow = 0;
+
+                if (item == IDB_UPGRADE)
+                        runCommand (L"wscript.exe", L"setfilter.js upgrade");
+
                 return true;
 
         default:
@@ -745,8 +852,18 @@ void showAbout (void) {
                 return;
         }
 
-        aboutWindow = CreateDialogW (GetModuleHandle (0),
-                                     MAKEINTRESOURCE (IDD_ABOUT), 0, aboutProc);
+        wchar_t       * nextVersion;
+        nextVersion = getSetting (LIMIT_SETTINGS, VERSION_VALUE);
+
+        wchar_t       * dialog = MAKEINTRESOURCE (IDD_ABOUT);
+        bool            upgrade = false;
+
+        if (nextVersion != 0 && wcscmp (nextVersion, appVer) != 0) {
+                upgrade = true;
+                dialog = MAKEINTRESOURCE (IDD_ABOUT_UPGRADE);
+        }
+
+        aboutWindow = CreateDialogW (GetModuleHandle (0), dialog, 0, aboutProc);
         if (aboutWindow == 0)
                 return;
 
@@ -1001,8 +1118,9 @@ wchar_t * getAppPath (void) {
         unsigned long   major = info->dwFileVersionMS >> 16;
         unsigned long   minor = info->dwFileVersionMS & 0xFFFF;
         unsigned long   build = info->dwFileVersionLS >> 16;
+        unsigned long   rev = info->dwFileVersionLS & 0xFFFF;
 
-        wsprintfW (path, L"%d.%d.%d", major, minor, build);
+        wsprintfW (path, L"%d.%d.%d.%d", major, minor, build, rev);
 
         length = wcslen (path) + 1;
         appVer = (wchar_t *) malloc (length * sizeof (wchar_t));
@@ -1027,7 +1145,7 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
                         quit = true;
         }
 
-        /**
+        /*
          * Look for an existing instance of the application.
          */
 
@@ -1139,6 +1257,17 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
         
         data.hWnd = window;
         Shell_NotifyIconW (NIM_ADD, & data);
+
+        /*
+         * Figure out when the last upgrade check was run. If there's no record
+         * of that in the registry yet, assume it's now.
+         */
+
+        upgradeCheckTime = getValue (LIMIT_SETTINGS, TIMESTAMP_VALUE);
+        if (upgradeCheckTime == 0) {
+                GetSystemTimeAsFileTime ((FILETIME *) & upgradeCheckTime);
+                setValue (LIMIT_SETTINGS, TIMESTAMP_VALUE, & upgradeCheckTime);
+        }
 
         /*
          * Get the server IP to filter from the registry, along with the last

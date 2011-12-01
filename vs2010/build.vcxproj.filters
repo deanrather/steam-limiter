@@ -18,6 +18,24 @@
     <None Include="..\install\setup.nsi">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\updateapp\makeip2isp.js">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\app.yaml">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\index.html">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\index.yaml">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\main.py">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\scripts\setfilter.js">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\limitver.h">

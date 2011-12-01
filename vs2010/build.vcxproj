@@ -12,6 +12,12 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\install\setup.nsi" />
+    <None Include="..\scripts\setfilter.js" />
+    <None Include="..\updateapp\app.yaml" />
+    <None Include="..\updateapp\index.html" />
+    <None Include="..\updateapp\index.yaml" />
+    <None Include="..\updateapp\main.py" />
+    <None Include="..\updateapp\makeip2isp.js" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\limitver.h" />

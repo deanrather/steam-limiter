@@ -19,6 +19,9 @@
 #define IDD_SERVERPICKER                104
 #define IDCB_PICKER                     32771
 
+#define IDD_ABOUT_UPGRADE               105
+#define IDB_UPGRADE                     32771
+
 #define IDS_SERVER0                     1000
 #define IDS_ADDRESS0                    2000
 // Next default values for new objects

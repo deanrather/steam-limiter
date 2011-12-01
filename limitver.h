@@ -33,7 +33,7 @@
 
 #define VER_MAJOR       0
 #define VER_MINOR       4
-#define VER_BUILD       0
+#define VER_BUILD       1
 #define VER_REV         0
 
 #define VAL(x)                  #x

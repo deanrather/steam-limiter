@@ -137,7 +137,7 @@ function deleteFile (path) {
 
     for (;;) {
         try {
-            fso.DeleteFile ("foo.txt");
+            fso.DeleteFile (path);
             return 0;
         } catch (e) {
             if (e.number !== 0x800A0046)

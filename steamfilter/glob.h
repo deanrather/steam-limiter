@@ -1,11 +1,12 @@
-/**@addtogroup Resource
+#ifndef GLOB_H
+#define GLOB_H                  1
+
+/**@addtogroup Filter Steam limiter filter hook DLL.
  * @{@file
  *
- * Version information for the limiter
+ * Declare prototype for a simple UNIX glob-matching routine.
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
- *
- * Copyright (C) 2011 Nigel Bree; All Rights Reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,29 +32,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define VER_MAJOR       0
-#define VER_MINOR       5
-#define VER_BUILD       0
-#define VER_REV         0
-
-#define VAL(x)                  #x
-#define STR(x)                  VAL (x)
-
-/**
- * File and product version information used by the sf2.rc resource script.
- * @{
- */
-
-#define VER_FILEVERSION         VER_MAJOR,VER_MINOR,VER_BUILD,VER_REV
-#define VER_PRODUCTVERSION      VER_FILEVERSION
-
-#define VER_PRODUCTNAME_STR     "SteamLimit"
-#define VER_COMPANYNAME_STR     "Nigel Bree <nigel.bree@gmail.com>"
-
-#define VER_COPYRIGHT_STR       "Copyright 2011 " VER_COMPANYNAME_STR
-
-#define VER_FILEVERSION_STR     STR (VER_MAJOR) "." STR (VER_MINOR) "." STR (VER_BUILD) "." STR (VER_REV)
-#define VER_PRODUCTVERSION_STR  VER_FILEVERSION_STR
+bool globMatch (const char * example, const wchar_t * pattern);
 
 /**@}*/
-/**@}*/
+#endif  /* ! defined (GLOB_H) */

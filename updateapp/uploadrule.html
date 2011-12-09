@@ -1,0 +1,45 @@
+<html>
+<head>
+<title>Steam Content Server Limiter</title>
+<link rel="stylesheet" type="text/css" href="base.css" />
+</head>
+
+<body>
+<div class="userinfo" id="userinfo">
+</div>
+
+<div class="about">
+<a href="/">
+<img class="icon" src="/favicon.ico"/>
+<span class="home">Home</span>
+</a>
+<h1>Upload Rules</h1>
+
+<p>The Steam Content Server Limiter allows users to specify custom rules for
+limiting Steam downloads, if their ISP is not one of the currently supported
+ones, or particularly for Australian users where the currently supplied filter
+does not represent the optimal selection of servers to use from the potential
+range of unmetered servers.</p>
+
+<p>As of v0.5, the intention is that as rules are configured at install time
+via this web service, that potentially provides a way to ensure that the rules
+are kept up to date without needing to download and install new code, much as
+the <a href="http://www.anguswolfcastle.co.cc/steam/csv">Steam Manager</a> tool
+does but in a more automated way, and with the ability to exert finer control
+over what the Steam client does - the expectation being that as Valve roll out
+more of their new HTTP-based Content Delivery Network, the ability of the
+Limiter application to control network APIs should become more useful.</p>
+
+</div>
+
+<div class="feedback">
+<form action="/feedback" method="post">
+<div><textarea name="ispname" rows="1" cols="80" placeholder="ISP name"></textarea></div>
+<div><textarea name="filterrule" rows="2" cols="80" placeholder="Filter rule"></textarea></div>
+<div><textarea name="content" rows="5" cols="80" placeholder="Additional notes"></textarea></div>
+<div><input type="submit" value="Suggest a Rule"/></div>
+</form>
+</div>
+
+</body>
+</html>

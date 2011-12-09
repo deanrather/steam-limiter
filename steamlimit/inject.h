@@ -1,11 +1,13 @@
-/**@addtogroup Resource
+#ifndef INJECT_H
+#define INJECT_H                1
+
+/**@addtogroup Monitor Steam limiter monitor application.
  * @{@file
  *
- * Version information for the limiter
+ * Declare the core functions for calling into a DLL injected into a target
+ * process.
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
- *
- * Copyright (C) 2011 Nigel Bree; All Rights Reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,29 +33,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define VER_MAJOR       0
-#define VER_MINOR       5
-#define VER_BUILD       0
-#define VER_REV         0
-
-#define VAL(x)                  #x
-#define STR(x)                  VAL (x)
-
 /**
- * File and product version information used by the sf2.rc resource script.
- * @{
+ * For globally recording the application's current path.
  */
 
-#define VER_FILEVERSION         VER_MAJOR,VER_MINOR,VER_BUILD,VER_REV
-#define VER_PRODUCTVERSION      VER_FILEVERSION
+extern  wchar_t       * appPath;
 
-#define VER_PRODUCTNAME_STR     "SteamLimit"
-#define VER_COMPANYNAME_STR     "Nigel Bree <nigel.bree@gmail.com>"
+/**
+ * Call into a filter DLL using a process ID, with the name and path of the
+ * filter DLL being implicitly generated from the calling process.
+ */
 
-#define VER_COPYRIGHT_STR       "Copyright 2011 " VER_COMPANYNAME_STR
-
-#define VER_FILEVERSION_STR     STR (VER_MAJOR) "." STR (VER_MINOR) "." STR (VER_BUILD) "." STR (VER_REV)
-#define VER_PRODUCTVERSION_STR  VER_FILEVERSION_STR
+bool callFilterId (unsigned long processId, const char * entryPoint,
+                   wchar_t * param = 0);
 
 /**@}*/
-/**@}*/
+#endif  /* ! defined (INJECT_H) */

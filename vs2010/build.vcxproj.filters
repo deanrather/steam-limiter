@@ -36,6 +36,18 @@
     <None Include="..\scripts\setfilter.js">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\updateapp\geofilter.bat">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\base.css">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\thanks.html">
+      <Filter>Source Files</Filter>
+    </None>
+    <None Include="..\updateapp\feedback.html">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\limitver.h">

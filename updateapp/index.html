@@ -6,6 +6,7 @@
 
 <body>
 <div class="userinfo" id="userinfo">
+<!-- placeholder for now, in case I want to add persistent user services -->
 </div>
 
 <div class="about">
@@ -33,15 +34,21 @@ this third-party helper does the job.</p>
 latest version</li>
 <li><a href="/ispname">/ispname</a> for a best guess at which supported
 ISP you are hosted on</li>
-<li><a href="/filterip">/filterip</a> which returns the content server IP
-matching the ISP reported in <a href="/ispname">/ispname</a></li>
+<li><a href="/filterip">/filterip</a> which returns an unmetered content server IP
+for your current ISP as reported in <a href="/ispname">/ispname</a></li>
+<li><a href="/filterrule">/filterrule</a> which returns a filter rule for your ISP
+as reported in <a href="/ispname">/ispname</a></li>
+<li><a href="/feedback">/feedback</a> which provides a simple, anonymous
+feedback mechanism to the project author.</li>
+<li><a href="/uploadrule">/uploadrule</a> which provides a simple, anonymous
+method of contributing custom rule suggestions for the filter tools</li>
 </ul>
 
-<p>These services are intended to allow the installer for the Steam Limiter
-to automatically determine which of the supported ISPs you are a customer
-of so that the correct filter is used by default, and to help the Limiter
-to automatically check for new versions and assist in downloading the
-installer for the latest version</p>
+<p>These services are primarily intended to allow the installer for the
+Steam Limiter to automatically determine which of the supported ISPs you
+are a customer of so that the correct filter is used by default, and to
+help the Limiter to automatically check for new versions and assist in
+downloading the installer for the latest version</p>
 
 <p>No personally identifiable information is retained by this service,
 although for the purposes of debugging the /ispname and /filterip services

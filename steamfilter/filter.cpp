@@ -30,7 +30,9 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
+ */
+
+/*
  * Although I did have an earlier version which tried to use vectored exception
  * handling for detouring the connect function, this version is simpler and is
  * built to use the built-in patching facilities in Windows DLLs, as per
@@ -39,6 +41,10 @@
 
 #include "../nolocale.h"
 #include <winsock2.h>
+
+#include "glob.h"
+#include "filterrule.h"
+
 
 /**
  * For declaring exported callable functions from the injection shim.
@@ -72,32 +78,6 @@ typedef int (WSAAPI * ConnectFunc) (SOCKET s, const sockaddr * name, int namelen
 typedef struct hostent * (WSAAPI * GetHostFunc) (const char * name);
 
 /**
- * This is an assistant function in WS2_32.DLL we can use to parse a string
- * address.
- *
- * This allows us to take an address from the controlling program passed as a
- * parameter and convert it into the address to monitor.
- */
-
-typedef int (WSAAPI * GetAddrInfoWFunc) (const wchar_t * node,
-                                         const wchar_t * service,
-                                         const ADDRINFOW * hints,
-                                         ADDRINFOW ** result);
-
-/**
- * Companion to the above to free memory it allocates.
- */
-
-typedef void (WSAAPI * FreeAddrInfoWFunc) (ADDRINFOW * mem);
-
-/**
- * To make GetAddrInfoW () easier to call from explicit dynamic linking.
- */
-
-GetAddrInfoWFunc        g_addrFunc;
-FreeAddrInfoWFunc       g_freeFunc;
-
-/**
  * This is the original connect () function, just past the patch area.
  */
 
@@ -119,9 +99,7 @@ GetHostFunc             g_gethostResume;
  * The Telstra IP address we're after in network byte order.
  */
 
-unsigned char   want [4] = {
-        203, 167, 129, 4
-};
+FilterRules     g_rules (27030);
 
 /**
  * Hook for the connect () function; check if we want to rework it, or just
@@ -129,133 +107,97 @@ unsigned char   want [4] = {
  */
 
 int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
-        sockaddr_in   * addr = (sockaddr_in *) name;
+        sockaddr_in   * replace = 0;
+        if (name->sa_family != AF_INET ||
+            ! g_rules.match ((const sockaddr_in *) name, & replace)) {
+                /*
+                 * Just forward on to the original.
+                 */
+
+                return (* g_connectResume) (s, name, namelen);
+        }
+
+        OutputDebugStringA ("Connect redirected\r\n");
 
         /*
-         * For now we just look for a single address and redirect connections
-         * to it if the port matches. Making this use multiple addresses is
-         * easy when allowing them to pass through, but more complex to use in
-         * picking one to detour to.
-         *
-         * As there's no real substantial benefit to supporting more than one
-         * at the moment (all New Zealand ISPs only use a single content server
-         * in any case) supporting multiple filters is not really worth it.
+         * If no replacement is specified, deny the connection. This isn't used
+         * for Steam blocking in most cases because it responds to this by just
+         * trying another server.
          */
 
-        if (namelen == sizeof (sockaddr_in) &&
-            addr->sin_family == AF_INET &&
-            addr->sin_port == SWAP (27030)) {
-                /*
-                 * It's a content server connection, give it a pass or fail.
-                 */
-
-                if (memcmp (& addr->sin_addr, want, 4) == 0) {
-                        OutputDebugStringA ("Content server permitted!\n");
-                } else {
-                        /*
-                         * If we want to fail it, it seems that Steam is more
-                         * happy with us subtly redirecting it at only the
-                         * server we want to permit rather than returning
-                         * WSAECONNREFUSED, which seems to make it loop trying
-                         * to find a second content server.
-                         */
-
-                        OutputDebugStringA ("Content server redirected!\n");
-                        memcpy (& addr->sin_addr, want, 4);
-                }
+        if (replace == 0) {
+                SetLastError (WSAECONNREFUSED);
+                return SOCKET_ERROR;
         }
+
+        /*
+         * Redirect the connection; put the rewritten address into a temporary
+         * so the change isn't visible to the caller (Steam doesn't appear to
+         * care either way, but it's best to be careful).
+         */
+
+        sockaddr_in   * base = (sockaddr_in *) name;
+        sockaddr_in     temp;
+        temp.sin_family = base->sin_family;
+        temp.sin_port = replace->sin_port != 0 ? replace->sin_port :
+                        base->sin_port;
+        temp.sin_addr = replace->sin_addr.S_un.S_addr != 0 ?
+                        replace->sin_addr : base->sin_addr;
                 
-        return (* g_connectResume) (s, name, namelen);
-}
-
-/**
- * Ultra-simple glob matcher.
- */
-
-bool globMatch (const char * example, const char * pattern) {
-        if (example == 0)
-                return false;
-
-        char            ch;
-        for (; (ch = * pattern) != 0 ; ++ pattern) {
-                if (ch == '?') {
-                        /*
-                         * Allow any character or the end of the example string
-                         * to match a '?'.
-                         */
-
-                        if (* example != 0)
-                                ++ example;
-
-                        continue;
-                } else if (ch != '*') {
-                        /*
-                         * Exact match on one character.
-                         */
-
-                        if (* example != ch)
-                                return false;
-
-                        ++ example;
-                        continue;
-                }
-
-                /*
-                 * Wildcard match, consume any number of characters. As in the
-                 * original UNIX v6 code, this is a fairly inefficient way of
-                 * implementing Kleene-type closure compared to any of the more
-                 * fun matching systems (Boyer-Moore, Knuth-Morris-Pratt, or
-                 * most forms of regular expression execution via compilation
-                 * to NFA/DFA/vm-code) but it's super-simple and as small code
-                 * size is part of the design goal, why not?
-                 */
-
-                for (;;) {
-                        /*
-                         * Start with a recursive call just on the example, so
-                         * that we permit 0 characters to match.
-                         */
-
-                        if (globMatch (example, pattern + 1))
-                                return true;
-
-                        if (* example == 0)
-                                return false;
-
-                        ++ example;
-                }
-        }
-        return * example == 0;
+        return (* g_connectResume) (s, (sockaddr *) & temp, sizeof (temp));
 }
 
 /**
  * Hook for the gethostbyname () Sockets address-resolution function.
- *
- * This looks for a glob-type pattern to reject or accept the name resolution,
- * and for now just says that it can't find a host. At some point I should add
- * some function to configure the filter string, but for now it is what it is.
  */
 
 struct hostent * WSAAPI gethostHook (const char * name) {
-        if (! globMatch (name, "content*.steampowered.com"))
+        sockaddr_in   * replace = 0;
+        if (! g_rules.match (name, & replace))
                 return (* g_gethostResume) (name);
 
-        OutputDebugStringA (name);
-        OutputDebugStringA (" DNS result blocked\r\n");
+        OutputDebugStringA ("gethostbyname redirected\r\n");
+
+        if (replace == 0) {
+                /*
+                 * On Windows, WSAGetLastError () and WSASetLastError () are
+                 * just thin wrappers around GetLastError ()/SetLastError (),
+                 * so we can use SetLastError ().
+                 *
+                 * Set up the right error number for a nonexistent host, since
+                 * this classic BSD sockets API doesn't have a proper error
+                 * reporting mechanism and that's what most code looks for to
+                 * see what went wrong.
+                 */
+
+                SetLastError (WSAHOST_NOT_FOUND);
+                return 0;
+        }
 
         /*
-         * On Windows, WSAGetLastError () and WSASetLastError () are
-         * just thin wrappers around GetLastError ()/SetLastError (),
-         * so we can use SetLastError ().
+         * Replacing a DNS result raises the question of storage, which for
+         * base Windows sockets is per-thread; we could also choose to use a
+         * non-thread-safe global like most UNIX implementations.
          *
-         * Set up the right error number for a nonexistent host, since
-         * this classic BSD sockets API doesn't have a proper error
-         * reporting mechanism and that's what most code looks for to
-         * see what went wrong.
+         * One obvious trick would be to let the underlying call return the
+         * structure which we modify, but the tradeoff there is that if it
+         * fails we don't have a pointer.
+         *
+         * So for now, cheese out and use a global; also, copy the address
+         * rather than point at the replacement.
          */
 
-        SetLastError (WSAHOST_NOT_FOUND);
-        return 0;
+static  hostent         result;
+static  unsigned long   addr;
+
+        addr = replace->sin_addr.S_un.S_addr;
+        result.h_addrtype = AF_INET;
+        result.h_addr_list = (char **) & addr;
+        result.h_aliases = 0;
+        result.h_length = sizeof (addr);
+        result.h_name = "remapped.local";
+
+        return & result;
 }
 
 /**
@@ -294,30 +236,27 @@ HMODULE         g_instance;
  */
 
 int setFilter (wchar_t * address) {
-        if (g_addrFunc == 0 || g_freeFunc == 0 || address == 0)
+        if (address == 0)
                 return 0;
 
-        ADDRINFOW     * result;
-        if ((* g_addrFunc) (address, L"27030", 0, & result) != 0)
-                return 0;
+        bool            result = g_rules.install (address);
+        if (result) {
+                /*
+                 * For now, always append this black-hole DNS rule to the main
+                 * rule set. Later on this might change but this will do until
+                 * the full situation with the HTTP CDN is revealed.
+                 *
+                 * Since rules are processed in order, this still allows custom
+                 * rules to redirect these DNS lookups to take place, as those
+                 * will take precedence to this catch-all.
+                 */
 
-        ADDRINFOW     * scan = result;
-        while (scan != 0) {
-                if (scan->ai_family == AF_INET) {
-                        sockaddr_in   * inet = (sockaddr_in *) scan->ai_addr;
-                        memcpy (& want, & inet->sin_addr, sizeof (want));
-                        break;
-                }
-
-                scan = scan->ai_next;
+#if     1
+                g_rules.append (L"content?.steampowered.com=");
+#endif
         }
 
-        OutputDebugStringW (address);
-        OutputDebugStringA (scan == 0 ? " filter not resolved\n" :
-                            " filter installed");
-
-        (* g_freeFunc) (result);
-        return 1;
+        return result ? 1 : 0;
 }
 
 /**
@@ -386,13 +325,14 @@ void unhook (void * resumeAddress) {
  * Establish the hook filter we want on the connect function in WS2_32.DLL
  */
 
-STEAMDLL (int) SteamFilter (wchar_t * address) {
+STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
+                            size_t * resultSize) {
         /*
          * If we've already been called, this is a call to re-bind the address
          * being monitored.
          */
 
-        if (g_addrFunc != 0)
+        if (g_connectResume != 0)
                 return setFilter (address);
 
         /*
@@ -419,20 +359,9 @@ STEAMDLL (int) SteamFilter (wchar_t * address) {
         if (connFunc == 0)
                 return 0;
 
-        FARPROC         addrFunc = GetProcAddress (ws2, "GetAddrInfoW");
-        if (addrFunc == 0)
-                return 0;
-
-        FARPROC         freeFunc = GetProcAddress (ws2, "FreeAddrInfoW");
-        if (addrFunc == 0)
-                return 0;
-
         FARPROC         gethostFunc = GetProcAddress (ws2, "gethostbyname");
         if (gethostFunc == 0)
                 return 0;
-
-        g_addrFunc = (GetAddrInfoWFunc) addrFunc;
-        g_freeFunc = (FreeAddrInfoWFunc) freeFunc;
 
         if (address != 0)
                 setFilter (address);

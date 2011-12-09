@@ -190,6 +190,15 @@ if (hasArg ("upgrade")) {
     if (current === bundle.latest)
         WScript.Quit (0);
 
+    /*
+     * Before downloading the update package, verify that it's coming
+     * from a Google Code URL; this costs some future flexibility but
+     * it's just a safer thing to do.
+     */
+
+    if (! /^http:\/\/.*\.googlecode\.com\//.test (bundle.download))
+        WScript.Quit (3);
+
     var path = "package.exe";
     download (bundle.download, path);
 

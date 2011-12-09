@@ -113,8 +113,20 @@ freshInstall:
                    "UninstallString" "$\"$INSTDIR\uninst.exe$\""
 
 upgrade:
+  /*
+   * Before we write the new steamfilter.dll, deal with any stray copies of it
+   * that are still referenced; rarely, versions prior to v0.5 would be able to
+   * be confused by things like explorer.exe windows named "Steam" and so could
+   * end up with the DLL injected in multiple places. Renaming the in-use DLL
+   * works, so do that and then force it to be deleted.
+   */
+
+  Rename $INSTDIR\steamfilter.dll $INSTDIR\temp.dll
+  Delete /REBOOTOK $INSTDIR\temp.dll
+
   SetOutPath $INSTDIR
   WriteUninstaller $INSTDIR\uninst.exe
+
   File ${OutDir}\steamlimit.exe
   File ${OutDir}\steamfilter.dll
   File ..\scripts\setfilter.js

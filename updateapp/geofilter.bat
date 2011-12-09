@@ -21,3 +21,8 @@ rem codes used for the ISPs, since they sometimes have multiple assigned
 rem numbers; mapping the ASxxx numbers to an internal ID seems simplest,
 
 findstr /r "TelstraClear Orcon Snap.Internet" %1 >netblock.csv
+
+rem Targeting these Australian ISPs for now since they seem the biggest and
+rem some people from them have installed the limiter tool
+
+findstr /r "Telstra.Pty iiNet Internode Optus Primus" %1 > netblock2.csv

@@ -59,7 +59,8 @@ import logging
 import webapp2
 
 from google.appengine.ext.webapp import template
-from google.appengine.api import users
+from google.appengine.ext import db
+from google.appengine.api import users, xmpp, mail
 
 # These will most likely eventually become some datastore items in future, but
 # making them static will do just to start the update support off.
@@ -109,7 +110,7 @@ def stringip_to_number (text):
 
 def find_netblock (ip):
     if ip == '127.0.0.1':
-        ip = '202.124.127.66'
+        ip = '203.167.129.4'
 
     if type (ip) == str:
         ip = stringip_to_number (ip)
@@ -129,13 +130,81 @@ def find_netblock (ip):
     return - 1
 
 # The ISP indexes I use in the netblock table
+#
+# Here I prefer to use DNS names in the new-style filter rules, since it
+# should save on maintenance work; even for filtered servers the reverse
+# lookup tends to be available through DNS so only those cases where there
+# is no known standard name have I kept a raw IP.
+#
+# [ At least on the Australian side, the gamearena.com.au IP assignments have
+#   changed over time, but they have correctly kept the DNS names stable as
+#   they should, so theory and practice seem to be in accord. ]
+#
+# I can actually use DNS names for the 'server' item, but for the NZ ISPs I
+# didn't to start with so I'm being consistent out of habit; there's going to
+# be some complexity in the monitor app to upgrade rule styles so that the
+# webservice ones eventually get preferred, and to make running a redetect
+# easier (related to a feature request for home+away locations for LAN parties
+# and the like).
+#
+# The suggested rules here are somewhat of a stab in the dark; there are a
+# carefully curated set of rules for Steam maintained as part of Steam Manager
+# at http://www.anguswolfcastle.co.cc/steam but they don't use DNS names and
+# thus it's not entirely clear how the selection is done. Hence, the list here
+# is something I'm trying independently based on the raw data at places like
+# http://forums.whirlpool.net.au/forum-replies.cfm?t=1230616
+#
+# My intuition is that for most Australian users able to use Steam Manager
+# (i.e., not running Windows XP) it's a better choice than Steam Limiter in
+# any case because it's less prescriptive and as long as the IP list is long
+# enough the the Steam client can still exert a degree of freedom.
+#
+# Something powerful Steam Limiter can potentially do in future versions is
+# actually *measure* ping times to the servers in the filter list; making a
+# robust system for automatically managing the ideal server selection at an
+# even finer level than Valve do, and removing most of the need for manual
+# rule curation other than reports of new unmetered servers to add to the
+# rotation for monitorin). However, that depends on having a pool of users
+# willing to opt in to anonymously contributing that data, which I cannot
+# see occurring in the near future.
 
 isps = {
-    - 1: { 'name': 'Unknown', 'server': '203.167.129.4' },
-    0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4' },
-    1: { 'name': 'Orcon New Zealand', 'server': '219.88.241.90' },
-    2: { 'name': 'Snap! New Zealand', 'server': '202.124.127.66' }
+    - 1: { 'name': 'Unknown', 'server': '203.167.129.4',
+           'filter': '' },
+    0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
+         'filter': '*:27030=wlgwpstmcon01.telstraclear.co.nz' },
+    1: { 'name': 'Orcon New Zealand', 'server': '219.88.241.90',
+         'filter': '*:27030=steam.orcon.net.nz' },
+    2: { 'name': 'Snap! New Zealand', 'server': '202.124.127.66',
+         'filter': '*:27030=202.124.127.66' },
+
+    # Slots 3-9 are reserved for more NZ ISPs, such as Slingshot and Telecom
+    # New Zealand and perhaps Vodafone (my understanding is that Slingshot do
+    # have a Steam server but it's not clear what it's named nor whether it is
+    # unmetered).
+
+    # For the Australian ISPs I'm using two servers per ISP to start but the
+    # ideal lists here are a bit hard to figure, since there are a mix of
+    # filtered and non-filtered servers, and thanks to peering often customers
+    # of one ISP can get optimal service from a different peer.
+
+    10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
+          'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
+    11: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
+          'filter': '*:27030=steam1.filearena.net,steam-nsw.3fl.net.au' },
+    12: { 'name': 'Internode Australia', 'server': '150.101.120.97',
+          'filter': '*:27030=steam1.syd7.internode.on.net,49.143.234.14,' },
+    13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
+          'filter': '*:27030=49.143.234.6,49.143.234.14' },
+    14: { 'name': 'iPrimus Australia', 'server': '180.92.195.130',
+          'filter': '*:27030=180.92.195.130,steam1.syd7.internode.on.net' }
 }
+
+# Simplified writer for templates
+
+def expand (handler, name, context):
+    path = os.path.join (os.path.dirname (__file__), name)
+    handler.response.out.write (template.render (path, context))
 
 # The landing page for human readers to see
 
@@ -144,9 +213,7 @@ class MainHandler (webapp2.RequestHandler):
         context = {
             'user': users.get_current_user ()
         }
-
-        path = os.path.join (os.path.dirname (__file__), 'index.html')
-        self.response.out.write (template.render (path, context))
+        expand (self, 'index.html', context)
 
 # Since we're sending back data rather than plain text, abstract out the
 # wrapping of the data, permitting the caller to ask for JSONP style.
@@ -192,7 +259,8 @@ def bundle (self):
         'download': code_file_base + latest_file,
         'country': country,
         'ispname': isp ['name'],
-        'filterip': isp ['server']
+        'filterip': isp ['server'],
+        'filterrule': isp.get ('filter') or isp ['server']
     }
 
 # The query page for the latest revision, which can information about the latest
@@ -234,10 +302,20 @@ class IspHandler (webapp2.RequestHandler):
 
 # An alternative to the above for getting the IP value to use; here we'll
 # always default to the TelstraClear one.
+#
+# Now that more complex rules are supported, we'll return those or the simple
+# ones, as there doesn't need to be back-compat support for returning only the
+# simple ones as with the full bundle
 
 class FilterHandler (webapp2.RequestHandler):
     def get (self):
         send (self, bundle (self) ['filterip'])
+
+# Return the newer style of filter list.
+
+class FilterRuleHandler (webapp2.RequestHandler):
+    def get (self):
+        send (self, bundle (self) ['filterrule'])
 
 # Return a bundle of various of the above individual pieces as a JSON-style
 # map.
@@ -246,6 +324,82 @@ class BundleHandler (webapp2.RequestHandler):
     def get (self):
         send (self, bundle (self))
 
+# Handle notifying the project owner when a feedback form or uploaded
+# submission occurs. For now this is direct, but in future this could
+# equally well be done using the cron job API to roll up notifications in
+# a batch.
+
+def notifyOwner (text, kind):
+    status = xmpp.send_message ('nigel.bree@gmail.com',
+                                'Posted ' + kind + ': ' + text)
+    if status == xmpp.NO_ERROR:
+        return
+
+    # If XMPP is unavailable, fall back to e-mail
+
+    mail.send_mail ('Feedback <feedback@steam-limiter.appspotmail.com>',
+                    'Nigel Bree <nigel.bree@gmail.com>',
+                    'New ' + kind + ' posted',
+                    text)
+
+# Feedback model for the feedback submission form to persist
+
+class Feedback (db.Model):
+    content = db.StringProperty ()
+    source = db.StringProperty ()
+    timestamp = db.DateTimeProperty (auto_now = True)
+
+# Handle a feedback form, to allow people to spam me with whatever they like...
+# given that currently I'm suffering from a lack of feedback, this is meant
+# to help overcome that. We shall see if it works.
+
+class FeedbackHandler (webapp2.RequestHandler):
+    def get (self):
+        expand (self, 'feedback.html', { })
+
+    def post (self):
+        text = self.request.get ('content')
+
+        if text != '':
+            item = Feedback (content = text, source = self.request.remote_addr)
+            item.put ()
+
+            notifyOwner (text, 'feedback')
+
+        expand (self, 'thanks.html', { })
+
+# Similar to the general text feedback, we can have users upload their custom
+# rules as suggestions for future versions or revisions of the rule base now
+# that the rulebase exists completely in the webservice.
+
+class UploadedRule (db.Model):
+    ispName = db.StringProperty ()
+    filterRule = db.StringProperty ()
+    notes = db.StringProperty ()
+    source = db.StringProperty ()
+    timestamp = db.DateTimeProperty (auto_now = True)
+
+# Handle a new-rule suggestion form, intended to support a future automatic
+# upload of a user's custom rules.
+
+class UploadRuleHandler (webapp2.RequestHandler):
+    def get (self):
+        expand (self, 'uploadrule.html', { })
+
+    def post (self):
+        isp = self.request.get ('ispname')
+        rule = self.request.get ('filterrule')
+        note = self.request.get ('content')
+
+        if rule != '':
+            item = UploadedRule (ispName = isp, filterRule = rule, notes = note,
+                                 source = self.request.remote_addr)
+            item.put ()
+
+            notifyOwner (isp + ' ==> ' + rule, 'rule')
+
+        expand (self, 'thanks.html', { })
+
 # Plumb up the GAE boilerplate with a mapping of URLs to handlers.
 
 app = webapp2.WSGIApplication ([('/', MainHandler),
@@ -253,7 +407,10 @@ app = webapp2.WSGIApplication ([('/', MainHandler),
                                 ('/download', DownloadHandler),
                                 ('/ispname', IspHandler),
                                 ('/filterip', FilterHandler),
-                                ('/all', BundleHandler)],
+                                ('/filterrule', FilterRuleHandler),
+                                ('/all', BundleHandler),
+                                ('/feedback', FeedbackHandler),
+                                ('/uploadrule', UploadRuleHandler)],
                                debug = True)
 
 def main ():

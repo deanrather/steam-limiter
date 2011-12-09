@@ -11,12 +11,14 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\steamlimit\inject.cpp" />
     <ClCompile Include="..\steamlimit\monitor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\steamlimit\monitor.rc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\steamlimit\inject.h" />
     <ClInclude Include="..\steamlimit\resource.h" />
   </ItemGroup>
   <ItemGroup>

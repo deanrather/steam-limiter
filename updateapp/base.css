@@ -5,3 +5,11 @@ div.user-info: {
 div.about img.icon {
   float: left
 }
+
+div.about span.home {
+  float: right
+}
+
+div.feedback textarea {
+  width: 100%
+}

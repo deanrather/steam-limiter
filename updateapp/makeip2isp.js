@@ -49,6 +49,11 @@ var fso = WScript.CreateObject ("Scripting.FileSystemObject");
  * The point of this is to cheat and use eval () to get each CSV line in as
  * a simple Javascript array item as an easy way to parse it before starting
  * to match the data.
+ *
+ * Note that Singtel Optus have a large number of additional ASN's listed as
+ * "Optus Customer Network" which are presumably netblocks managed by Optus
+ * on behalf of corporate customers rather than consumer ones, and so which
+ * we don't need to include.
  */
 
 function readFile (file) {
@@ -59,7 +64,13 @@ function readFile (file) {
         "AS9901": 0,
         "AS17746": 1,   /* Orcon */
         "AS55454": 1,
-        "AS23655": 2    /* Snap! */
+        "AS23655": 2,   /* Snap! */
+
+        "AS1221": 10,   /* Telstra */
+        "AS4208": 11,   /* iiNet */
+        "AS4739": 12,   /* Internode */
+        "AS7474": 13,   /* SingTel Optus */
+        "AS9443": 14    /* iPrimus aka Primus Telecommunications */
     };
 
     var getId = RegExp ().compile ("AS[0-9]+");
@@ -120,10 +131,11 @@ for (key in array) {
     if (key > 0)
         file.WriteLine (",")
 
-    if ((item.start & 0xFF) !== 0 || (item.end & 0xFF) !== 0xFF) {
-        WScript.Message ("Bad item!");
-        WScript.Quit (1);
-    }
+    /*
+     * Originally I checked that the netblock range was aligned on a class C
+     * boundary, but there's a *really* odd set of netblocks where Telstra and
+     * Google interleave at the level of 2-3 hosts around 1208927796
+     */
 
     file.Write ("    (" + item.start + ", " + item.end + ", " + item.id + ")")
 }

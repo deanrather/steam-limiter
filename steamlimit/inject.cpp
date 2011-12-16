@@ -115,6 +115,7 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
 
 #define MOV_REG         0x8B
 #define EBX_ESI_OFFSET  0x5E
+#define EAX_ESI_OFFSET  ESI_OFFSET_EAX
 
 #define LEA             0x8D
 #define ESI_MEM         0x35
@@ -123,6 +124,11 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
 #define INDIRECT        0xFF
 #define PUSH_ESI_OFFSET 0x76
 #define CALL_ESI_OFFSET 0x56
+
+#define OR_REG          0x0B
+#define XOR_REG         0x31
+
+#define EAX_EAX         0xC0
 
 #define LEA_ESI_ADDRESS(p, x) do { \
                 * p ++ = LEA; \
@@ -139,6 +145,12 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
 #define MOV_ESI_AT_EAX(p, o) do { \
                 * p ++ = MOV_RM; \
                 * p ++ = ESI_OFFSET_EAX; \
+                * p ++ = (unsigned char) (o); \
+        } while (0)
+
+#define MOV_EAX_ESI_AT(p, o) do { \
+                * p ++ = MOV_REG; \
+                * p ++ = EAX_ESI_OFFSET; \
                 * p ++ = (unsigned char) (o); \
         } while (0)
 
@@ -172,8 +184,13 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
         } while (0)
 
 #define OR_EAX_EAX(p) do { \
-                * p ++ = 0x0B; \
-                * p ++ = 0xC0; \
+                * p ++ = OR_REG; \
+                * p ++ = EAX_EAX; \
+        } while (0)
+
+#define XOR_EAX_EAX(p) do { \
+                * p ++ = XOR_REG; \
+                * p ++ = EAX_EAX; \
         } while (0)
 
 #define JE_(p, o) do { \
@@ -223,6 +240,7 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
 
         struct ParamBlock {
                 FARPROC         loadLib;
+                FARPROC         gmh;
                 FARPROC         gpa;
                 FARPROC         freeLib;
                 wchar_t       * param;
@@ -236,7 +254,16 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
 
         ParamBlock    * params = (ParamBlock *) codeBytes;
 
+        /*
+         * Always clear out any stale values from a previous cycle, now that we
+         * copy back the entire parameter block from a call; we don't want any
+         * stale data in the new context.
+         */
+
+        memset (params, 0, sizeof (codeBytes));
+
         params->loadLib = GetProcAddress (kernel, "LoadLibraryW");
+        params->gmh = GetProcAddress (kernel, "GetModuleHandleW");
         params->gpa = GetProcAddress (kernel, "GetProcAddress");
         params->freeLib = GetProcAddress (kernel, "FreeLibrary");
 
@@ -254,22 +281,33 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
         }
 
         /*
-         * Write the actual path string, and backpatch a pointer to it.
+         * Write the actual path string, and backpatch a pointer to it; also
+         * find the last backslash in the path string, and use that to work out
+         * a pointer to the last part of the path to see if we want to use
+         * GetModuleHandle () instead.
+         *
+         * Using GetModuleHandle () is a nice trick if there might potentially
+         * be another copy of our injected DLL (possibly an older version, for
+         * instance) floating around blocking a normal load attempt.
          */
 
+        bool            getModule = wcschr (path, L'\\') == 0;
         dest = writeString (start = dest, path);
         writePointer (& params->path, mem + (start - codeBytes));
 
         /*
          * Now write out the name of the entry point we want to use; this is
          * in plain ASCII because GetProcAddress works that way.
+         *
+         * We allow this to be empty for the same reason we have support for
+         * GetModuleHandle (). It allows us to express the desire to in effect
+         * force-unload a module by decrementing its reference count.
          */
 
-        if (entryName == 0)
-                entryName = "SteamFilter";
-
-        dest = writeString (start = dest, entryName);
-        writePointer (& params->entryName, mem + (start - codeBytes));
+        if (entryName != 0) {
+                dest = writeString (start = dest, entryName);
+                writePointer (& params->entryName, mem + (start - codeBytes));
+        }
 
         /*
          * Starting here we build the actual x86 loader code.
@@ -289,50 +327,69 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
          * myLib = LoadLibraryW (L"steamfilter.dll");
          */
 
-        PUSH_ESI_AT (dest, offsetof (ParamBlock, path));
-        CALL_ESI_AT (dest, offsetof (ParamBlock, loadLib));
+        if (getModule) {
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, path));
+                CALL_ESI_AT (dest, offsetof (ParamBlock, gmh));
 
-        MOV_ESI_AT_EAX (dest, offsetof (ParamBlock, loadedLibrary));
+                if (entryName == 0)
+                        MOV_ESI_AT_EAX (dest, offsetof (ParamBlock, loadedLibrary));
+        } else {
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, path));
+                CALL_ESI_AT (dest, offsetof (ParamBlock, loadLib));
+
+                MOV_ESI_AT_EAX (dest, offsetof (ParamBlock, loadedLibrary));
+        }
+
+        if (entryName != 0) {
+                /*
+                 * myFunc = GetProcAddress (mylib, "SteamFilter");
+                 */
+
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, entryName));
+                * dest ++ = PUSH_EAX;
+                CALL_ESI_AT (dest, offsetof (ParamBlock, gpa));
+                MOV_ESI_AT_EAX (dest, offsetof (ParamBlock, entryPoint));
+
+                /*
+                 * if (myFunc != 0)
+                 *   (* myFunc) (param, & result, & resultSize);
+                 *
+                 * Note that we guard this by saving ESP in EBP so we're robust if the
+                 * calling convention or parameter count don't match. The function is
+                 * passed the address of the incoming string and pointer to free space
+                 * in the shim it can write some output to.
+                 */
+
+                MOV_EBP_ESP (dest);
+                LEA_EBX_ESI_AT (dest, offsetof (ParamBlock, resultSize));
+                * dest ++ = PUSH_EBX;
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, result));
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, param));
+
+                MOV_EAX_ESI_AT (dest, offsetof (ParamBlock, entryPoint));
+                OR_EAX_EAX (dest);
+                JE_ (dest, CALL_ESI_SIZE);
+
+                CALL_ESI_AT (dest, offsetof (ParamBlock, entryPoint));
+
+                MOV_ESP_EBP (dest);
+        } else
+                XOR_EAX_EAX (dest);
 
         /*
-         * myFunc = GetProcAddress (mylib, "SteamFilter");
-         */
-
-        PUSH_ESI_AT (dest, offsetof (ParamBlock, entryName));
-        * dest ++ = PUSH_EAX;
-        CALL_ESI_AT (dest, offsetof (ParamBlock, gpa));
-        MOV_ESI_AT_EAX (dest, offsetof (ParamBlock, entryPoint));
-
-        /*
-         * if (myFunc != 0)
-         *   (* myFunc) (param, & result, & resultSize);
-         *
-         * Note that we guard this by saving ESP in EBP so we're robust if the
-         * calling convention or parameter count don't match. The function is
-         * passed the address of the incoming string and pointer to free space
-         * in the shim it can write some output to.
-         */
-
-        MOV_EBP_ESP (dest);
-        LEA_EBX_ESI_AT (dest, offsetof (ParamBlock, resultSize));
-        * dest ++ = PUSH_EBX;
-        PUSH_ESI_AT (dest, offsetof (ParamBlock, result));
-        PUSH_ESI_AT (dest, offsetof (ParamBlock, param));
-        OR_EAX_EAX (dest);
-        JE_ (dest, CALL_ESI_SIZE);
-
-        CALL_ESI_AT (dest, offsetof (ParamBlock, entryPoint));
-
-        MOV_ESP_EBP (dest);
-
-        /*
-         * FreeLibrary (myLib);
+         * if (myLib != 0)
+         *    FreeLibrary (myLib);
          * return;
          */
 
         * dest ++ = PUSH_EAX;
-        PUSH_ESI_AT (dest, offsetof (ParamBlock, loadedLibrary));
+        MOV_EAX_ESI_AT (dest, offsetof (ParamBlock, loadedLibrary));
+        OR_EAX_EAX (dest);
+        JE_ (dest, CALL_ESI_SIZE + 1);
+
+        * dest ++ = PUSH_EAX;
         CALL_ESI_AT (dest, offsetof (ParamBlock, freeLib));
+
         * dest ++ = POP_EAX;
         * dest ++ = RET;
 
@@ -413,8 +470,38 @@ unsigned long callFilter (HANDLE steam, const wchar_t * path,
                 return 0;
 
         unsigned long   result;
-        result = injectFilter (steam, (unsigned char *) mem, path, entryPoint,
-                               param);
+        int             tries = 1;
+
+        if (strcmp (entryPoint, "SteamFilter") == 0)
+                ++ tries;
+
+        for (;;) {
+                result = injectFilter (steam, (unsigned char *) mem, path, entryPoint,
+                                       param);
+
+                if (result != ~ 0UL || tries < 2)
+                        break;
+
+                /*
+                 * This is used to indicate that an old instance might have
+                 * been left attached, in which case we can try using a special
+                 * shim to force it to unload before having another go at
+                 * loading our instance.
+                 */
+
+                -- tries;
+                injectFilter (steam, (unsigned char *) mem, L"steamfilter.dll",
+                              0, 0);
+        }
+
+        if (strcmp (entryPoint, "FilterUnload") == 0) {
+                /*
+                 * Give the unload an extra refcount adjustment just in case.
+                 */
+
+                injectFilter (steam, (unsigned char *) mem, L"steamfilter.dll",
+                              0, 0);
+        }
 
         /*
          * Always unload our shim; if we want to call another function in the

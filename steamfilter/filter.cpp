@@ -117,18 +117,19 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                 return (* g_connectResume) (s, name, namelen);
         }
 
-        OutputDebugStringA ("Connect redirected\r\n");
-
         /*
          * If no replacement is specified, deny the connection. This isn't used
          * for Steam blocking in most cases because it responds to this by just
          * trying another server.
          */
 
-        if (replace == 0) {
+        if (replace == 0 || replace->sin_addr.S_un.S_addr == INADDR_NONE) {
+                OutputDebugStringA ("Connect refused\r\n");
                 SetLastError (WSAECONNREFUSED);
                 return SOCKET_ERROR;
         }
+
+        OutputDebugStringA ("Connect redirected\r\n");
 
         /*
          * Redirect the connection; put the rewritten address into a temporary
@@ -153,12 +154,17 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
 
 struct hostent * WSAAPI gethostHook (const char * name) {
         sockaddr_in   * replace = 0;
-        if (! g_rules.match (name, & replace))
+        if (! g_rules.match (name, & replace) ||
+            (replace != 0 && replace->sin_addr.S_un.S_addr == INADDR_ANY)) {
+                /*
+                 * If there's no matching rule, or the matching rule is a
+                 * passthrough, then let things slide.
+                 */
+
                 return (* g_gethostResume) (name);
+        }
 
-        OutputDebugStringA ("gethostbyname redirected\r\n");
-
-        if (replace == 0) {
+        if (replace == 0 || replace->sin_addr.S_un.S_addr == INADDR_NONE) {
                 /*
                  * On Windows, WSAGetLastError () and WSASetLastError () are
                  * just thin wrappers around GetLastError ()/SetLastError (),
@@ -170,9 +176,12 @@ struct hostent * WSAAPI gethostHook (const char * name) {
                  * see what went wrong.
                  */
 
+                OutputDebugStringA ("gethostbyname refused\r\n");
                 SetLastError (WSAHOST_NOT_FOUND);
                 return 0;
         }
+
+        OutputDebugStringA ("gethostbyname redirected\r\n");
 
         /*
          * Replacing a DNS result raises the question of storage, which for
@@ -275,7 +284,7 @@ bool attachHook (void * address, void * newTarget) {
 
         unsigned char * data = (unsigned char *) address;
         if (* (unsigned short *) data != MOV_EDI_EDI) {
-                OutputDebugStringA ("SteamFilter: connect not patchable\n");
+                OutputDebugStringA ("SteamFilter: not patchable\n");
                 return false;
         }
 
@@ -373,8 +382,16 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
 
         g_connectResume = (ConnectFunc) ((char *) connFunc + 2);
         if (! attachHook (connFunc, connectHook)) {
-                OutputDebugStringA ("SteamFilter: connect not patchable\n");
-                return 0;
+                /*
+                 * This path generally indicates that another instance of the
+                 * program has left an old filter DLL attached (should be rare
+                 * in real life, but easy to do accidentally with a debugger).
+                 *
+                 * Returning a distinctive status can trigger a new code path
+                 * in v0.5 which will try and unload the old instance.
+                 */
+
+                return ~ 0UL;
         }
 
         g_gethostResume = (GetHostFunc) ((char *) gethostFunc + 2);
@@ -386,8 +403,7 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
                 unhook (g_connectResume);
                 g_connectResume = 0;
 
-                OutputDebugStringA ("SteamFilter: gethostbyname not patchable\n");
-                return 0;
+                return ~ 0UL;
         }
 
         OutputDebugStringA ("SteamFilter hook attached\n");

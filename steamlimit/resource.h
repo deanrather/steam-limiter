@@ -4,22 +4,27 @@
 //
 #define IDI_APPICON                     100
 #define IDS_APPTITLE                    101
-#define IDR_CONTEXTMENU                 102
+#define IDS_ABOUT                       102
+#define IDS_PICKSERVER                  103
+
+#define IDR_CONTEXTMENU                 200
+
 #define ID_CONTEXT_SHOWSTEAM            32771
 #define ID_CONTEXT_AUTOSTART            32772
 #define ID_CONTEXT_ABOUT                32773
-#define ID_CONTEXT_SITE                 32774
 #define ID_CONTEXT_ENABLED              32775
 #define ID_CONTEXT_SERVER               32776
 #define ID_CONTEXT_EXIT                 32779
-#define IDD_ABOUT                       103
+
+#define IDD_ABOUT                       201
 #define IDC_APPNAME                     32780
 #define IDC_SITE                        32781
+#define IDC_AUTHOR                      32782
 
-#define IDD_SERVERPICKER                104
+#define IDD_SERVERPICKER                202
 #define IDCB_PICKER                     32771
 
-#define IDD_ABOUT_UPGRADE               105
+#define IDD_ABOUT_UPGRADE               203
 #define IDB_UPGRADE                     32771
 
 #define IDS_SERVER0                     1000

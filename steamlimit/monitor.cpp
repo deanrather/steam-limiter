@@ -33,6 +33,7 @@
  */
 
 #include "inject.h"
+#include "hyperlink.h"
 #include "../nolocale.h"
 
 #include "resource.h"
@@ -45,7 +46,13 @@
 
 #define ARRAY_LENGTH(a)         (sizeof (a) / sizeof (* a))
 
+/**
+ * Various internal-use window messages.
+ */
+
 #define WM_NOTIFYICON   (WM_USER + 1)
+#define WM_SUSPEND      (WM_USER + 2)
+#define WM_SUSPENDED    (WM_USER + 3)
 
 /**
  * Globally record the application's current path.
@@ -459,10 +466,48 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
                             LPARAM lparam) {
         unsigned short  item = LOWORD (wparam);
         unsigned short  code = HIWORD (wparam);
+        Hyperlink     * link;
 
         switch (message) {
+        case WM_INITDIALOG: {
+                /*
+                 * Provide some text for the taskbar, since setting a caption
+                 * in the dialog resource forces a window title.
+                 */
+
+                wchar_t         title [1024];
+                LoadString (GetModuleHandle (0), IDS_ABOUT,
+                            title, ARRAY_LENGTH (title));
+                SetWindowText (window, title);
+
+                /*
+                 * Subclass the IDC_SITE control.
+                 */
+
+                Hyperlink :: attach (window, IDC_SITE);
+                Hyperlink :: attach (window, IDC_AUTHOR);
+                break;
+            }
+
+        case WM_NCHITTEST: {
+                /*
+                 * Make the entire dialog draggable, since there's no caption.
+                 */
+
+                RECT            rect;
+                GetWindowRect (window, & rect);
+                POINT           point = { LOWORD (lparam), HIWORD (lparam) };
+                if (PtInRect (& rect, point)) {
+                        SetWindowLong (window, DWLP_MSGRESULT, HTCAPTION);
+                        return TRUE;
+                }
+                break;
+            }
+
         case WM_COMMAND:
                 switch (item) {
+                case IDC_SITE:
+                case IDC_AUTHOR:
                 case IDOK:
                 case IDB_UPGRADE:
                         if (code != BN_CLICKED)
@@ -477,6 +522,12 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
                 if (item == 0)
                         break;
 
+                link = Hyperlink :: at (window, item);
+                if (link != 0) {
+                        runCommand (link->link ());
+                        return 0;
+                }
+
                 DestroyWindow (window);
                 if (window == aboutWindow)
                         aboutWindow = 0;
@@ -485,6 +536,9 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
                         runCommand (L"wscript.exe", L"setfilter.js upgrade");
 
                 return true;
+
+        case WM_MOUSELEAVE:
+                break;
 
         default:
                 break;
@@ -549,8 +603,41 @@ void showAbout (void) {
 
 INT_PTR CALLBACK pickProc (HWND window, UINT message, WPARAM wparam,
                            LPARAM lparam) {
-        if (message != WM_COMMAND)
-                return FALSE;
+        switch (message) {
+        case WM_INITDIALOG: {
+                /*
+                 * Provide some text for the taskbar, since setting a caption
+                 * in the dialog resource forces a window title.
+                 */
+
+                wchar_t         title [1024];
+                LoadString (GetModuleHandle (0), IDS_PICKSERVER,
+                            title, ARRAY_LENGTH (title));
+                SetWindowText (window, title);
+                return 0;
+            }
+
+        case WM_NCHITTEST: {
+                /*
+                 * Make the entire dialog draggable, since there's no caption.
+                 */
+
+                RECT            rect;
+                GetWindowRect (window, & rect);
+                POINT           point = { LOWORD (lparam), HIWORD (lparam) };
+                if (PtInRect (& rect, point)) {
+                        SetWindowLong (window, DWLP_MSGRESULT, HTCAPTION);
+                        return TRUE;
+                }
+                break;
+            }
+
+        case WM_COMMAND:
+                break;
+
+        default:
+                return 0;
+        }
 
         unsigned short  item = LOWORD (wparam);
         unsigned short  code = HIWORD (wparam);
@@ -666,8 +753,17 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
                              LPARAM lparam) {
         switch (message) {
         case WM_CLOSE:
+                DestroyWindow (window);
                 PostQuitMessage (0);
                 return 0;
+
+        case WM_SUSPEND:
+                DestroyWindow (window);
+                steamPoll (false);
+
+                PostThreadMessage (GetCurrentThreadId (), WM_SUSPENDED,
+                                   wparam, lparam);
+                return 1;
 
                 /*
                  * Handle notification area icon actions.
@@ -700,10 +796,6 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
 
                 case ID_CONTEXT_SHOWSTEAM:
                         runCommand (L"steam://nav/downloads");
-                        break;
-
-                case ID_CONTEXT_SITE:
-                        runCommand (L"http://steam-limiter.googlecode.com");
                         break;
 
                 case ID_CONTEXT_AUTOSTART:
@@ -803,10 +895,20 @@ wchar_t * getAppPath (void) {
 
 int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int show) {
         bool            quit = false;
+        bool            suspend = false;
 
         for (; __argc > 1 ; -- __argc, ++ __wargv) {
-                if (wcscmp (__wargv [1], L"-quit") == 0)
+                wchar_t       * arg = __wargv [1];
+                if (wcscmp (arg, L"-quit") == 0) {
                         quit = true;
+                        continue;
+                }
+
+                if (wcscmp (arg, L"-debug") == 0 ||
+                    wcscmp (arg, L"-suspend") == 0) {
+                        suspend = true;
+                        continue;
+                }
         }
 
         /*
@@ -816,12 +918,29 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
         HWND            window;
         window = FindWindowEx (0, 0, L"SteamMonitor", 0);
 
-        if (window != 0) {
+        while (window != 0) {
+                if (suspend) {
+                        LRESULT         result;
+                        result = SendMessage (window, WM_SUSPEND,
+                                              GetCurrentProcessId (), 0);
+
+                        if (result != 0)
+                                break;
+
+                        /*
+                         * If the target is an older version that doesn't have
+                         * support for the new suspend operation, ask it to
+                         * exit instead.
+                         */
+
+                        quit = true;
+                }
+
                 /*
-                 * If there is an existing instance, we always exit; we may,
-                 * however, ask the existing instance to close, and for the
-                 * benefit of the invoking process we can wait until the window
-                 * no longer exists.
+                 * If there is an existing instance, we always exit; we may
+                 * also ask the existing instance to close, and for the benefit
+                 * of the invoking process we can wait until the window no
+                 * longer exists.
                  */
 
                 while (quit) {
@@ -833,7 +952,17 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
 
                         Sleep (100);
                 }
-                return 0;
+
+                /*
+                 * If we were quitting because of a failed suspend then we can
+                 * go ahead and run rather than exit.
+                 */
+
+                if (! suspend)
+                        return 0;
+
+                quit = false;
+                break;
         }
 
         if (quit)
@@ -877,6 +1006,11 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
         ATOM            windowClass;
         windowClass = RegisterClassExW (& classDef);
 
+        /*
+         * Allow the application to restart itself here after suspending.
+         */
+
+reinitialize:
         int             style;
         style = WS_CAPTION | WS_POPUP | WS_SYSMENU;
 
@@ -944,21 +1078,54 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
 
         filterDisabled = getFilter ();
 
+        unsigned short  release = 0;
+
         for (;;) {
                 unsigned long   wait;
                 wait = MsgWaitForMultipleObjects (0, 0, 0, 1000, QS_ALLINPUT);
 
                 if (wait == WAIT_TIMEOUT) {
+                        /*
+                         * Poll for a Steam client running.
+                         */
+
                         steamPoll (true);
+
+                        /*
+                         * After a number of continuous poll cycles, wipe the
+                         * process working set to reduce memory load, at the
+                         * cost of a few more page faults when we *are*
+                         * interacted with to reinstate the Windows UI bits.
+                         */
+
+                        if (++ release != 10)
+                                continue;
+
+                        SetProcessWorkingSetSize (GetCurrentProcess (),
+                                                  ~ 0UL, ~ 0UL);
                         continue;
                 }
+
+                release = 0;
 
                 MSG             message;
                 while (PeekMessage (& message, 0, 0, 0, TRUE)) {
                         if (message.message == WM_QUIT) {
-                                Shell_NotifyIconW (NIM_DELETE, & data); 
-                                steamPoll (false);
-                                return 0;
+                                quit = true;
+                                break;
+                        }
+                        if (message.message == WM_SUSPENDED) {
+                                Shell_NotifyIconW (NIM_DELETE, & data);
+                                HANDLE          proc;
+                                proc = OpenProcess (SYNCHRONIZE, false,
+                                                    message.wParam);
+
+                                if (proc != 0) {
+                                        WaitForSingleObject (proc, INFINITE);
+                                        CloseHandle (proc);
+                                }
+
+                                goto reinitialize;
                         }
 
                         if (aboutWindow != 0 &&
@@ -974,7 +1141,14 @@ int CALLBACK wWinMain (HINSTANCE instance, HINSTANCE, wchar_t * command, int sho
                         TranslateMessage (& message);
                         DispatchMessage (& message);
                 }
+
+                if (quit) {
+                        Shell_NotifyIconW (NIM_DELETE, & data);
+                        steamPoll (false);
+                        return 0;
+                }
         }
+
 
 }
 

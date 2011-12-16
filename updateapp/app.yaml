@@ -1,5 +1,5 @@
 application: steam-limiter
-version: 1
+version: 2
 runtime: python27
 threadsafe: true
 api_version: 1
@@ -22,6 +22,10 @@ handlers:
 - url: /base\.css
   static_files: base.css
   upload: base\.css
+
+- url: /robots\.txt
+  static_files: robots.txt
+  upload: robots\.txt
 
 - url: .*
   script: main.app

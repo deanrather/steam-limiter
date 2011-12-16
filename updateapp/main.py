@@ -328,10 +328,25 @@ class BundleHandler (webapp2.RequestHandler):
 # submission occurs. For now this is direct, but in future this could
 # equally well be done using the cron job API to roll up notifications in
 # a batch.
+#
+# Note that the free tier of GAE severely restricts the amoun of outbound
+# e-mail to 100 messages/day, hence why XMPP notification is a better kind
+# of default if significant traffic is expected. Not that I do expect any
+# more than one or two actual notifications to occur, but it's nice to show
 
 def notifyOwner (text, kind):
-    status = xmpp.send_message ('nigel.bree@gmail.com',
-                                'Posted ' + kind + ': ' + text)
+    # Send an invitation first so that the GAE instance gets permission
+    # as a contact so that later messages are received properly instead of
+    # getting binned (as the GTalk servers tend to do, as a spam-control
+    # measure).
+    #
+    # This is particularly useful when running a test instance of a GAE app
+    # as each will use a distinct source JID for itself.
+
+    who = 'nigel.bree@gmail.com'
+    xmpp.send_invite (who)
+    status = xmpp.send_message (who, 'Posted ' + kind + ': ' + text)
+
     if status == xmpp.NO_ERROR:
         return
 
@@ -396,9 +411,16 @@ class UploadRuleHandler (webapp2.RequestHandler):
                                  source = self.request.remote_addr)
             item.put ()
 
-            notifyOwner (isp + ' ==> ' + rule, 'rule')
+            notifyOwner (isp + ' ==> ' + rule + '\n' + note, 'rule')
 
         expand (self, 'thanks.html', { })
+
+# Custom 404 that suggests filing an issue rather than the default blank.
+
+class NotFoundHandler (webapp2.RequestHandler):
+    def get (self):
+        self.error (404)
+        expand (self, 'default_error.html', { })
 
 # Plumb up the GAE boilerplate with a mapping of URLs to handlers.
 
@@ -410,7 +432,8 @@ app = webapp2.WSGIApplication ([('/', MainHandler),
                                 ('/filterrule', FilterRuleHandler),
                                 ('/all', BundleHandler),
                                 ('/feedback', FeedbackHandler),
-                                ('/uploadrule', UploadRuleHandler)],
+                                ('/uploadrule', UploadRuleHandler),
+                                ('/.*', NotFoundHandler)],
                                debug = True)
 
 def main ():

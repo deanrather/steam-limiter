@@ -57,7 +57,25 @@ function hasArg (name) {
  */
 
 var xhr = WScript.CreateObject ("MSXML2.XmlHttp");
+var shell = WScript.CreateObject ("WScript.Shell");
 var base = "http://steam-limiter.appspot.com/";
+var regPath = "HKCU\\Software\\SteamLimiter\\"
+
+/**
+ * Include the requesting app version and WScript version in the user-agent
+ * string so I can get a rough idea what old versions are around as I roll the
+ * limiter app forward; thisalso gives me useful options in the webservice to
+ * handle back-compatibility for request URLs by using the user-agent string
+ * to return results formatted for older versions.
+ */
+
+var version;
+try {
+  version = shell.RegRead (regPath + "LastVersion");
+} catch (e) {
+  version = "0.4.1.0";
+}
+version = version + '(WScript ' + WScript.Version + ')';
 
 /**
  * Simple wrapper for using the XHR object synchronously to get data from the
@@ -69,7 +87,7 @@ function simpleGet (path) {
         path = base + path;
 
     xhr.open ("GET", path, false);
-    xhr.setRequestHeader ("User-Agent", "steam-limiter");
+    xhr.setRequestHeader ("User-Agent", "steam-limiter/" + version);
 
     try {
         xhr.send ();
@@ -165,8 +183,6 @@ if (hasArg ("debug")) {
 if (xhr == undefined)
     WScript.Quit (1);
 
-var shell = WScript.CreateObject ("WScript.Shell");
-
 /*
  * Get all the data in a bundle; when developing the webservice I kept all the
  * services separate (and it's still handy that way so anyone interested can
@@ -182,8 +198,6 @@ if (hasArg ("show"))
 
 if (! bundle || ! bundle.latest || ! bundle.filterip)
     WScript.Quit (2);
-
-var regPath = "HKCU\\Software\\SteamLimiter\\"
 
 if (hasArg ("upgrade")) {
     var current = shell.RegRead (regPath + "LastVersion")

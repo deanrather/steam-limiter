@@ -21,6 +21,9 @@
     <ClCompile Include="..\steamlimit\inject.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\steamlimit\hyperlink.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\steamlimit\monitor.rc">
@@ -32,6 +35,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\steamlimit\inject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\steamlimit\hyperlink.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

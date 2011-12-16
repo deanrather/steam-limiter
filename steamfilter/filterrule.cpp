@@ -315,13 +315,54 @@ bool FilterRule :: parseReplace (const wchar_t * from, const wchar_t * to,
 
         wchar_t         text [40];
         from = unescape (text, ARRAY_LENGTH (text), from, to);
+        if (from == 0) {
+                free (mem);
+                return false;
+        }
+
+        for (;;) {
+                /*
+                 * Filter whitespace, but don't use the regular C library
+                 * character classification, as the multibyte support in the
+                 * VC++ RTL is a bloated monstrosity and we don't want it.
+                 */
+
+                wchar_t         ch = * from;
+                switch (ch) {
+                case 0:
+                        /*
+                         * An empty element in a replacement list means block.
+                         */
+
+                        addr->sin_addr.S_un.S_addr = INADDR_NONE;
+                        link = temp;
+                        return true;
+
+                case '*':
+                        /*
+                         * A * in a replacement list means pass through unchanged.
+                         */
+
+                        addr->sin_addr.S_un.S_addr = INADDR_ANY;
+                        link = temp;
+                        return true;
+
+                case '\n':
+                case '\r':
+                case '\t':
+                case ' ':
+                        ++ from;
+                        continue;
+
+                default:
+                        break;
+                }
+
+                break;
+        }
 
         ADDRINFOW     * wide = 0;
-        unsigned long   result = - 1;
-        
-        if (from != 0 && * from != 0)
-                result = (* g_addrFunc) (from, 0, 0, & wide);
-
+        unsigned long   result = (* g_addrFunc) (from, 0, 0, & wide);
         if (result != 0) {
                 /*
                  * For now, rather than failing things we make failed address

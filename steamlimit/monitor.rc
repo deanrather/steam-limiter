@@ -115,7 +115,6 @@ BEGIN
     POPUP "Context"
     BEGIN
         MENUITEM "&Steam Downloads",            ID_CONTEXT_SHOWSTEAM
-        MENUITEM "Limiter &Home page",          ID_CONTEXT_SITE
         MENUITEM "&About"                       ID_CONTEXT_ABOUT
         MENUITEM SEPARATOR
         MENUITEM "&Launch at Windows Login",    ID_CONTEXT_AUTOSTART, CHECKED
@@ -132,33 +131,32 @@ END
 // Dialog
 //
 
-IDD_ABOUT DIALOGEX 0, 0, 200, 34
+IDD_ABOUT DIALOGEX 0, 0, 200, 44
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
-EXSTYLE WS_EX_TOOLWINDOW
 FONT 10, "MS Shell Dlg"
 BEGIN
-    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 0, 200, 10
-    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Static", SS_CENTER, 0, 10, 200, 10
+    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 2, 200, 10
+    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Button", BS_CENTER | WS_TABSTOP, 0, 10, 200, 10
+    CONTROL "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, "Button", BS_CENTER | WS_TABSTOP, 0, 20, 200, 10
 
-    CONTROL "O&K", IDOK, "Button", BS_DEFPUSHBUTTON | BS_CENTER, 90, 22, 30, 10
+    CONTROL "O&K", IDOK, "Button", BS_DEFPUSHBUTTON | BS_CENTER | WS_TABSTOP, 85, 32, 30, 10
 END
 
-IDD_ABOUT_UPGRADE DIALOGEX 0, 0, 200, 44
+IDD_ABOUT_UPGRADE DIALOGEX 0, 0, 200, 54
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
-EXSTYLE WS_EX_TOOLWINDOW
 FONT 10, "MS Shell Dlg"
 BEGIN
-    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 0, 200, 10
-    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Static", SS_CENTER, 0, 10, 200, 10
-    CONTROL "A new version is available!", 0, "Static", SS_CENTER, 0, 20, 200, 10
+    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 2, 200, 10
+    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Button", BS_CENTER | WS_TABSTOP, 0, 10, 200, 10
+    CONTROL "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, "Button", BS_CENTER | WS_TABSTOP, 0, 20, 200, 10
+    CONTROL "A new version is available!", 0, "Static", SS_CENTER, 0, 30, 200, 10
 
-    CONTROL "&Upgrade Now", IDB_UPGRADE, "Button", BS_DEFPUSHBUTTON | BS_CENTER, 25, 32, 50, 10
-    CONTROL "&No Thanks", IDOK, "Button", BS_CENTER, 125, 32, 50, 10
+    CONTROL "&Upgrade Now", IDB_UPGRADE, "Button", BS_DEFPUSHBUTTON | BS_CENTER | WS_TABSTOP, 25, 42, 50, 10
+    CONTROL "&No Thanks", IDOK, "Button", BS_CENTER, 125, 42, 50, 10
 END
 
 IDD_SERVERPICKER DIALOGEX 0, 0, 235, 14
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
-EXSTYLE WS_EX_TOOLWINDOW
 FONT 10, "MS Shell Dlg"
 BEGIN
     COMBOBOX IDCB_PICKER, 0, 1, 140, 200, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
@@ -174,6 +172,8 @@ END
 STRINGTABLE
 BEGIN
     IDS_APPTITLE        "Steam Content Server Limiter"
+    IDS_ABOUT           "About Steam Limiter"
+    IDS_PICKSERVER      "Select Server"
 
     IDS_SERVER0         "TelstraClear New Zealand"
     IDS_SERVER0 + 1     "Orcon New Zealand"

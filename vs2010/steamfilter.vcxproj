@@ -62,7 +62,6 @@
   <ItemGroup>
     <ClCompile Include="..\steamfilter\filter.cpp" />
     <ClCompile Include="..\steamfilter\filterrule.cpp">
-      <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NoListing</AssemblerOutput>
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
     </ClCompile>
     <ClCompile Include="..\steamfilter\glob.cpp" />

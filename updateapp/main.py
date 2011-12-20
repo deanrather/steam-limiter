@@ -147,12 +147,11 @@ def find_netblock (ip):
 # easier (related to a feature request for home+away locations for LAN parties
 # and the like).
 #
-# The suggested rules here are somewhat of a stab in the dark; there are a
-# carefully curated set of rules for Steam maintained as part of Steam Manager
-# at http://www.anguswolfcastle.co.cc/steam but they don't use DNS names and
-# thus it's not entirely clear how the selection is done. Hence, the list here
-# is something I'm trying independently based on the raw data at places like
-# http://forums.whirlpool.net.au/forum-replies.cfm?t=1230616
+# The suggested rules here are somewhat of a stab in the dark; I initially
+# tried my own, but Angus Wolfcastle has posted a set in an attachment at
+# http://www.anguswolfcastle.co.cc/steam-1/filtering-methods - his will be
+# way better than anything I could do and since he's written that I'll
+# incorporate them right away for the benefit of the Australian folks.
 #
 # My intuition is that for most Australian users able to use Steam Manager
 # (i.e., not running Windows XP) it's a better choice than Steam Limiter in
@@ -191,9 +190,9 @@ isps = {
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
           'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
     11: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-nsw.3fl.net.au' },
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     12: { 'name': 'Internode Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=steam1.syd7.internode.on.net,49.143.234.14,' },
+          'filter': '*:27030=49.143.234.14,111.119.10.2,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2' },
     13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
           'filter': '*:27030=49.143.234.6,49.143.234.14' },
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',

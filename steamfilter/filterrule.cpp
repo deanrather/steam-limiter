@@ -222,6 +222,31 @@ wchar_t * FilterRule :: wcsdup (const wchar_t * from, const wchar_t * to) {
 }
 
 /**
+ * Similar to wcsdup () but append two strings.
+ */
+
+wchar_t * FilterRule :: wcscatdup (const wchar_t * left, const wchar_t * middle,
+                                   const wchar_t * right) {
+        if (left == 0)
+                return :: wcsdup (right);
+
+        size_t          leftLen = left == 0 ? 0 : wcslen (left);
+        size_t          middleLen = middle == 0 ? 0 : wcslen (middle);
+        size_t          rightLen = right == 0 ? 0 : wcslen (right);
+
+        size_t          size = (leftLen + middleLen + rightLen + 1) * sizeof (wchar_t);
+        wchar_t       * temp = (wchar_t *) malloc (size);
+        if (left != 0)
+                wcscpy (temp, left);
+        if (middle != 0)
+                wcscpy (temp + leftLen, middle);
+        if (right != 0)
+                wcscpy (temp + leftLen + middleLen, right);
+
+        return temp;
+}
+
+/**
  * Look for a port specification in a pattern or replacement specification and
  * extract it.
  */
@@ -553,7 +578,8 @@ static bool l_initFuncs (void) {
  */
 
 FilterRules :: FilterRules (unsigned short defaultPort) :
-                m_head (0), m_tail (0), m_defaultPort (defaultPort) {
+                m_head (0), m_tail (0),  m_pending (0),
+                m_defaultPort (defaultPort) {
 }
 
 /**
@@ -562,6 +588,7 @@ FilterRules :: FilterRules (unsigned short defaultPort) :
 
 FilterRules :: ~ FilterRules () {
         freeRules (m_head);
+        free (m_pending);
 }
 
 /**
@@ -673,13 +700,25 @@ void FilterRules :: freeRules (FilterRule * head) {
 
 /* static */
 bool FilterRules :: install (const wchar_t * specs) {
-        if (! l_initFuncs ())
-                return false;
+        if (! l_initFuncs ()) {
+                /*
+                 * If we get here before the DLLs have loaded, save the specs.
+                 * When called to do a match, the DLLs will be present and we
+                 * can do a deferred init.
+                 *
+                 * Obviously this means we can't report some errors properly,
+                 * but it's a reasonable trade-off.
+                 */
+
+                if (specs != 0)
+                        m_pending = wcsdup (specs);
+                return true;
+        }
 
         FilterRule    * head = 0;
         FilterRule    * tail = 0;
 
-        if (! parse (specs, 0, head, tail))
+        if (specs != 0 && ! parse (specs, 0, head, tail))
                 return false;
 
         EnterCriticalSection (l_filterLock);
@@ -706,11 +745,21 @@ bool FilterRules :: install (const wchar_t * specs) {
 
 /* static */
 bool FilterRules :: append (const wchar_t * specs) {
-        if (! l_initFuncs ())
-                return false;
-
+        if (! l_initFuncs ()) {
+                wchar_t       * temp;
+                temp = FilterRule :: wcscatdup (m_pending, L";", specs);
+                free (m_pending);
+                m_pending = temp;
+                return true;
+        }
 
         EnterCriticalSection (l_filterLock);
+
+        if (m_pending != 0) {
+                parse (m_pending, 0, m_head, m_tail);
+                free (m_pending);
+                m_pending = 0;
+        }
 
         bool            result;
         result = parse (specs, 0, m_head, m_tail);
@@ -737,6 +786,9 @@ bool FilterRules :: append (const wchar_t * specs) {
  */
 
 bool FilterRules :: match (const sockaddr_in * name, sockaddr_in ** replace) {
+        if (! l_initFuncs ())
+                return false;
+
         unsigned short  port = ntohs (name->sin_port);
         char            example [24];
 
@@ -748,6 +800,12 @@ bool FilterRules :: match (const sockaddr_in * name, sockaddr_in ** replace) {
                         port);
 
         EnterCriticalSection (l_filterLock);
+
+        if (m_pending != 0) {
+                parse (m_pending, 0, m_head, m_tail);
+                free (m_pending);
+                m_pending = 0;
+        }
 
         FilterRule    * test = m_head;
         addrinfo      * out = 0;
@@ -777,7 +835,16 @@ bool FilterRules :: match (const sockaddr_in * name, sockaddr_in ** replace) {
  */
 
 bool FilterRules :: match (const char * name, sockaddr_in ** replace) {
+        if (! l_initFuncs ())
+                return false;
+
         EnterCriticalSection (l_filterLock);
+
+        if (m_pending != 0) {
+                parse (m_pending, 0, m_head, m_tail);
+                free (m_pending);
+                m_pending = 0;
+        }
 
         FilterRule    * test = m_head;
         addrinfo      * out = 0;

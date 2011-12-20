@@ -132,6 +132,13 @@ Hyperlink :: Hyperlink (HWND window, WNDPROC proc) : m_proc (proc),
         m_underline = CreateFontIndirectW (& logFont);
 
         /*
+         * Get the control's style bits to help do the resizing below in the
+         * proper method according to the style.
+         */
+
+        unsigned long   style = GetWindowLong (window, GWL_STYLE);
+
+        /*
          * Resize the underlying control to make it match the size of the
          * actual text. Width is more of an issue than height here.
          */
@@ -146,10 +153,19 @@ Hyperlink :: Hyperlink (HWND window, WNDPROC proc) : m_proc (proc),
          * Add a few pixels of margin for a focus rectangle.
          */
 
-        UINT            delta = rect.right + rect.left - size.cx - 6;
+        UINT            delta = rect.right + rect.left - size.cx;
 
-        rect.left += delta / 2;
-        rect.right -= delta / 2;
+        if ((style & BS_RIGHT) != 0) {
+                rect.left += delta - 3;
+                rect.right += 3;
+        } else if ((style & BS_LEFT) != 0) {
+                rect.left -= 3;
+                rect.right -= delta - 3;
+        } else {
+                delta -= 6;
+                rect.left += delta / 2;
+                rect.right -= delta / 2;
+        }
 
         m_rect.left = 0;
         m_rect.top = 0;

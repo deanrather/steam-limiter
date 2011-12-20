@@ -245,9 +245,6 @@ HMODULE         g_instance;
  */
 
 int setFilter (wchar_t * address) {
-        if (address == 0)
-                return 0;
-
         bool            result = g_rules.install (address);
         if (result) {
                 /*
@@ -260,9 +257,7 @@ int setFilter (wchar_t * address) {
                  * will take precedence to this catch-all.
                  */
 
-#if     1
                 g_rules.append (L"content?.steampowered.com=");
-#endif
         }
 
         return result ? 1 : 0;
@@ -372,8 +367,7 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
         if (gethostFunc == 0)
                 return 0;
 
-        if (address != 0)
-                setFilter (address);
+        setFilter (address);
 
         /*
          * Actually establish the diversion on the Windows Sockets connect ()

@@ -13,6 +13,8 @@
 !searchparse /file ..\limitver.h "#define VER_MINOR       " VER_MINOR
 !searchparse /file ..\limitver.h "#define VER_BUILD       " VER_BUILD
 !searchparse /file ..\limitver.h "#define VER_REV         " VER_REV
+!searchparse /file ..\limitver.h "#define VER_COMPANYNAME_STR " VER_AUTHOR
+!searchparse /file ..\limitver.h "#define VER_WEBSITE_STR " VER_WEBSITE
 
 /*
  * Describe the installer executable the NSIS compiler builds.
@@ -29,6 +31,13 @@ InstallDir "$PROGRAMFILES\LimitSteam"
 Icon ..\steamlimit\monitor.ico
 
 /*
+ * The script language requires custom variable declarations here, not in the
+ * section where the variables are used.
+ */
+
+Var SETTINGS
+
+/*
  * Set the installer executable version information.
  */
 
@@ -37,6 +46,8 @@ VIAddVersionKey /LANG=${LANG_ENGLISH} "ProductName" "Steam Content Server Limite
 VIAddVersionKey /LANG=${LANG_ENGLISH} "LegalCopyright" "© Nigel Bree <nigel.bree@gmail.com>"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "FileDescription" "Steam Content Server Limiter Install"
 VIAddVersionKey /LANG=${LANG_ENGLISH} "FileVersion" "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}"
+VIAddVersionKey /LANG=${LANG_ENGLISH} "Author" ${VER_AUTHOR}
+VIAddVersionKey /LANG=${LANG_ENGLISH} "Website" ${VER_WEBSITE}
 
 /*
  * Describe the installer flow, very minimal for us.
@@ -57,9 +68,9 @@ UninstPage Instfiles
  * needs.
  *
  * This is per the UAC plugin wiki page, which is incorrect in most every other
- * respect (as it was rewritten from scratch for 0.2 onwards and the author has
- * never documented the new version). This one aspect of the old documentation
- * seems to still work, though.
+ * respect (as it was rewritten from scratch for v0.2 of the plugin onwards and
+ * the author has never documented the new version). This one aspect of the old
+ * documentation seems to still work, though, and it's all we need.
  */
 
 Function .onInit
@@ -95,6 +106,8 @@ Function quitProgram
 FunctionEnd
 
 Section
+  StrCpy $SETTINGS "Software\SteamLimiter"
+
   IfFileExists $INSTDIR\steamlimit.exe 0 freshInstall
     !insertmacro UAC_AsUser_Call Function quitProgram ${UAC_SYNCINSTDIR}
     goto upgrade
@@ -103,6 +116,8 @@ freshInstall:
   /*
    * By default, run at login. Since our app is so tiny, this is hardly
    * intrusive and undoing it is a simple context-menu item.
+	 *
+	 * If upgrading, all this should still be in place so we leave it alone.
    */
 
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SteamLimiter" \
@@ -144,9 +159,9 @@ upgrade:
    * and to be able to offload data changes to a webservice.
    */
 
-  WriteRegStr HKCU "Software\SteamLimiter" "LastVersion" \
+  WriteRegStr HKCU $SETTINGS "LastVersion" \
                    "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
-  WriteRegStr HKCU "Software\SteamLimiter" "NextVersion" \
+  WriteRegStr HKCU $SETTINGS "NextVersion" \
                    "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
 
   /*
@@ -154,37 +169,103 @@ upgrade:
    * HKCU key and launch the monitor app.
    */
 
-  ReadRegStr $0 HKLM "Software\SteamLimiter" "Server"
-  IfErrors 0 setServerValue
+  ReadRegStr $0 HKLM $SETTINGS "Server"
+  IfErrors 0 gotServerValue
 
   /*
    * See if there's an existing setting under HKCU - if so, preserve it and
    * just move on to launching the monitor app.
    */
 
-  ReadRegStr $0 HKCU "Software\SteamLimiter" "Server"
-  IfErrors 0 finishInstall
+  ReadRegStr $0 HKCU $SETTINGS "Server"
+  IfErrors detectHomeProfile
 
+gotServerValue:
+  /*
+   * The existing server setting can get migrated to the "custom" profile, and
+   * unless it's one we know already we can select the custom profile as well.
+   * If it's one of the 3 ones baked into pre-v0.5 installs we can take that as
+   * a sign to use the "home" profile instead as we do for fresh installs.
+   *
+   * Most of the pre-0.5 installs which need custom servers are in Australia
+   * and the new server-side filters should support them better (as they all
+   * allow multiple servers to be used), but users should discover the "home"
+   * profile option reasonably quickly.
+   */
+
+  WriteRegStr HKCU "$SETTINGS\C" "Filter" $0
+
+  StrCmp $0 "203.167.129.4" 0 notTelstra
+
+  WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
+	WriteRegStr HKCU "$SETTINGS\C" "ISP" "TelstraClear New Zealand"
+	goto detectHomeProfile
+
+notTelstra:
+	StrCmp $0 "219.88.241.90" 0 notOrcon
+
+  WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
+	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Orcon New Zealand"
+  goto detectHomeProfile
+
+notOrcon:
+	StrCmp $0 "202.124.127.66" 0 notSnap
+
+  WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
+	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Snap! New Zealand"
+  goto detectHomeProfile
+
+notSnap:
+  /*
+	 * Stick with the custom profile.
+	 */
+	 
+	WriteRegStr HKCU "$SETTINGS\C" "Country" "AU"
+	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Unknown"
+	WriteRegDWORD HKCU $SETTINGS "Profile" 3
+
+detectHomeProfile:
   /*
    * We don't have an existing setting - try and auto-configure the right
    * one based on detecting the upstream ISP using a web service. There's
    * a small script to do this which we can run (elevated if necessary).
    */
 
-  ExecWait 'wscript "$INSTDIR\setfilter.js"'
+  ExecWait 'wscript "$INSTDIR\setfilter.js" install'
+  IfErrors 0 setProfile
+    /*
+     * This value is for TelstraClear; use it if we have to.
+     */
+
+    StrCpy $0 "*:27030=wlgwpstmcon01.telstraclear.co.nz"
+    WriteRegStr HKCU "$SETTINGS\A" "Filter" $0
+    WriteRegStr HKCU "$SETTINGS\A" "Country" "NZ"
+		WriteRegStr HKCU "$SETTINGS\A" "ISP" "TelstraClear New Zealand"
+
+setProfile:
+  ReadRegDWORD $0 HKCU $SETTINGS "Profile"
   IfErrors 0 finishInstall
+		/*
+	   * If there's an existing profile selection, leave it.
+		 * Otherwise, default to the "home" profile.
+		 */
 
-  /*
-   * This value is for TelstraClear; use it if we have to.
-   */
-
-  StrCpy $0 "203.167.129.4"
-
-setServerValue:
-  WriteRegStr HKCU "Software\SteamLimiter" "Server" $0
+    WriteRegDWORD HKCU $SETTINGS "Profile" 1
 
 finishInstall:
-  DeleteRegKey HKLM "Software\SteamLimiter"
+  /*
+	 * Remove all the pre-v0.4 settings.
+	 */
+
+  DeleteRegKey HKLM $SETTINGS
+	
+	/*
+	 * Remove pre-v0.5 settings that were moved to profile options.
+	 */
+
+	DeleteRegValue HKCU $SETTINGS "Server"
+	DeleteRegValue HKCU $SETTINGS "ISP"
+
   !insertmacro UAC_AsUser_Call Function runProgram ${UAC_SYNCINSTDIR}
 SectionEnd
 
@@ -199,6 +280,6 @@ Section "Uninstall"
   DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
   DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LimitSteam"
-  DeleteRegKey HKLM "Software\SteamLimiter"
-  DeleteRegKey HKCU "Software\SteamLimiter"
+  DeleteRegKey HKLM $SETTINGS
+  DeleteRegKey HKCU $SETTINGS
 SectionEnd

@@ -211,7 +211,7 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
 
 unsigned long injectFilter (HANDLE steam, unsigned char * mem,
                             const wchar_t * path, const char * entryName,
-                            wchar_t * paramString = 0) {
+                            const wchar_t * paramString = 0) {
         /*
          * The first two entries in the codeBytes will be the addresses of the
          * LoadLibrary and GetProcAddress functions which will bootstrap in our
@@ -455,7 +455,7 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
  */
 
 unsigned long callFilter (HANDLE steam, const wchar_t * path,
-                          const char * entryPoint, wchar_t * param = 0) {
+                          const char * entryPoint, const wchar_t * param = 0) {
         /*
          * Allocate a page of VM inside the target process.
          *
@@ -517,14 +517,14 @@ unsigned long callFilter (HANDLE steam, const wchar_t * path,
  */
 
 bool callFilterId (unsigned long processId, const char * entryPoint,
-                   wchar_t * param) {
+                   const wchar_t * param) {
         /*
          * Form a full path name to our shim DLL based on our own executable
          * file name.
          */
 
         wchar_t         path [1024];
-        wcscpy_s (path, ARRAY_LENGTH (path), appPath);
+        wcscpy_s (path, ARRAY_LENGTH (path), g_appPath);
 
         wchar_t       * end = wcsrchr (path, '\\');
         if (end == 0)

@@ -34,6 +34,7 @@
 
 #include "inject.h"
 #include "hyperlink.h"
+#include "profile.h"
 #include "../nolocale.h"
 
 #include "resource.h"
@@ -58,25 +59,19 @@
  * Globally record the application's current path.
  */
 
-wchar_t       * appPath;
+wchar_t       * g_appPath;
 
 /**
  * A string version of the application version data.
  */
 
-wchar_t       * appVer;
+wchar_t       * g_appVer;
 
 /**
  * If filtering is (temporarily, anyway) currently disabled.
  */
 
-bool            filterDisabled;
-
-/**
- * The IP of the server we wish to limit Steam to using.
- */
-
-wchar_t       * serverName;
+bool            g_filterDisabled;
 
 /**
  * The last known steam process ID we have worked with.
@@ -86,25 +81,31 @@ wchar_t       * serverName;
  * the next poll attempt.
  */
 
-unsigned long   steamProcess;
+unsigned long   g_steamProcess;
 
 /**
  * If our "about" window is visible, the window should be here.
  */
 
-HWND            aboutWindow;
+HWND            g_aboutWindow;
 
 /**
- * If the server-picker window is visible, the window should be here.
+ * Put the profile-picker window here.
  */
 
-HWND            pickWindow;
+HWND            g_profileWindow;
 
 /**
  * The last known time that we checked for an upgraded version.
  */
 
-ULONGLONG       upgradeCheckTime;
+ULONGLONG       g_upgradeCheckTime;
+
+/**
+ * The currently selected profile ID, which determines the filter to use.
+ */
+
+unsigned long   g_profileId;
 
 /**
  * How often to check for upgrades after being installed.
@@ -134,134 +135,21 @@ ULONGLONG       upgradeCheckTime;
 #define DISABLE_VALUE   L"Disabled"
 #define VERSION_VALUE   L"NextVersion"
 #define TIMESTAMP_VALUE L"UpgradeCheck"
-
-#define SERVER_VALUE    L"Server"
-
-/**
- * Common code for managing simple settings.
- */
-
-void setSetting (const wchar_t * path, const wchar_t * valueName,
-                 const wchar_t * value) {
-        HKEY            key;
-        LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_WRITE, & key);
-        if (result != ERROR_SUCCESS)
-                return;
-
-        if (value != 0) {
-                RegSetValueExW (key, valueName, 0, REG_SZ, (BYTE *) value,
-                                (wcslen (value) + 1) * sizeof (wchar_t));
-        } else
-                RegDeleteValueW (key, valueName);
-
-        RegCloseKey (key);
-}
+#define PROFILE_VALUE   L"Profile"
 
 /**
- * Set a 64-bit value in the registry.
+ * The application's setting root key.
  */
 
-void setValue (const wchar_t * path, const wchar_t * valueName,
-               ULONGLONG * value) {
-        HKEY            key;
-        LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_WRITE, & key);
-        if (result != ERROR_SUCCESS)
-                return;
+RegKey          g_settings (LIMIT_SETTINGS);
 
-        if (value != 0) {
-                RegSetValueExW (key, valueName, 0, REG_QWORD, (BYTE *) value,
-                                sizeof (* value));
-        } else
-                RegDeleteValueW (key, valueName);
-
-        RegCloseKey (key);
-}
-
-/**
- * Common code for testing a simple (boolean) setting.
- */
-
-bool testSetting (const wchar_t * path, const wchar_t * valueName) {
-        HKEY            key;
-        LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
-        if (result != ERROR_SUCCESS)
-                return false;
-
-        unsigned long   type;
-        unsigned long   length;
-        result = RegQueryValueExW (key, valueName, 0, & type, 0, & length);
-
-        RegCloseKey (key);
-
-        return result == ERROR_SUCCESS && type == REG_SZ;
-}
-
-/**
- * Read a simple string setting.
- */
-
-wchar_t * getSetting (const wchar_t * path, const wchar_t * valueName) {
-        HKEY            key;
-        LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
-        if (result != ERROR_SUCCESS)
-                return 0;
-
-        unsigned long   type;
-        unsigned long   length;
-        result = RegQueryValueExW (key, valueName, 0, & type, 0, & length);
-        if (result != ERROR_SUCCESS || type != REG_SZ) {
-                RegCloseKey (key);
-                return 0;
-        }
-
-        wchar_t       * value = (wchar_t *) malloc (length);
-        result = RegQueryValueExW (key, valueName, 0, & type, (BYTE *) value,
-                                   & length);
-        RegCloseKey (key);
-
-        if (result == ERROR_SUCCESS)
-                return value;
-
-        free (value);
-        return 0;
-}
-
-/**
- * Retrieve a 64-bit value from the registry, defaulting to 0.
- */
-
-ULONGLONG getValue (const wchar_t * path, const wchar_t * valueName) {
-        HKEY            key;
-        LSTATUS         result;
-        result = RegOpenKeyExW (HKEY_CURRENT_USER, path, 0, KEY_READ, & key);
-        if (result != ERROR_SUCCESS)
-                return 0;
-
-        unsigned long   type;
-        ULONGLONG       value = 0;
-        unsigned long   length = sizeof (value);
-
-        ULONGLONG       data;
-        result = RegQueryValueExW (key, valueName, 0, & type, (BYTE *) & value,
-                                   & length);
-        RegCloseKey (key);
-
-        if (result == ERROR_SUCCESS && length == sizeof (value))
-                return value;
-
-        return 0;
-}
 
 /**
  * Set the monitor process to autostart, or disable it.
  */
 
 void setAutostart (bool state) {
-        setSetting (WINDOWS_RUN, RUN_VALUE, state ? appPath : 0);
+        RegKey (WINDOWS_RUN) [RUN_VALUE] <<= (state ? g_appPath : 0);
 }
 
 /**
@@ -269,49 +157,36 @@ void setAutostart (bool state) {
  */
 
 bool getAutoStart (void) {
-        return testSetting (WINDOWS_RUN, RUN_VALUE);
+        bool            value;
+        RegKey (WINDOWS_RUN) [RUN_VALUE] >>= value;
+        return value;
 }
-
-/**
- * Set the enable state for the filter.
- */
-
-void setFilter (bool state) {
-        setSetting (LIMIT_SETTINGS, DISABLE_VALUE, state ? L"1" : 0);
-
-        /*
-         * Cause the filter setting to be applied to any existing filter
-         * instance.
-         */
-
-        filterDisabled = state;
-        steamProcess = 0;
-}
-
-/**
- * Get the current enable state for the filter.
- */
-
-bool getFilter (void) {
-        return testSetting (LIMIT_SETTINGS, DISABLE_VALUE);
-}
-
 
 /**
  * Use ShellExecute to fire off a URL, especially for the steam:// URL scheme.
  */
 
-void runCommand (const wchar_t * command, const wchar_t * parameters = 0) {
+void runCommand (const wchar_t * command, const wchar_t * parameters = 0,
+                 bool wait = false) {
         SHELLEXECUTEINFOW exec = { sizeof (exec) };
         exec.lpFile = command;
         exec.lpParameters = parameters;
+
+        if (wait) {
+                /*
+                 * Ask for the process handle so we can wait on it.
+                 */
+
+                exec.fMask |= SEE_MASK_NOCLOSEPROCESS;
+                SetCursor (LoadCursor (0, IDC_WAIT));
+        }
 
         /*
          * Force the current directory to be the application directory.
          */
 
         wchar_t         path [1024];
-        wcscpy_s (path, ARRAY_LENGTH (path), appPath);
+        wcscpy_s (path, ARRAY_LENGTH (path), g_appPath);
 
         wchar_t       * end = wcsrchr (path, '\\');
         if (end == 0)
@@ -320,6 +195,22 @@ void runCommand (const wchar_t * command, const wchar_t * parameters = 0) {
 
         exec.lpDirectory = path;
         ShellExecuteExW (& exec);
+
+        if (! wait)
+                return;
+
+        WaitForSingleObject (exec.hProcess, INFINITE);
+        CloseHandle (exec.hProcess);
+
+        /*
+         * Restore the Windows cursor back from the hourglass; using this will
+         * cause it to redetect the right cursor even if it got moved during
+         * the wait.
+         */
+
+        POINT           point;
+        GetCursorPos (& point);
+        SetCursorPos (point.x, point.y);
 }
 
 /**
@@ -333,9 +224,9 @@ void steamPoll (bool attach) {
         ULONGLONG       now;
         GetSystemTimeAsFileTime ((FILETIME *) & now);
 
-        if (now - upgradeCheckTime > UPGRADE_CHECK_DELTA) {
-                upgradeCheckTime = now;
-                setValue (LIMIT_SETTINGS, TIMESTAMP_VALUE, & now);
+        if (now - g_upgradeCheckTime > UPGRADE_CHECK_DELTA) {
+                g_upgradeCheckTime = now;
+                g_settings [TIMESTAMP_VALUE] <<= now;
                 runCommand (L"wscript.exe", L"setfilter.js");
         }
 
@@ -390,9 +281,9 @@ static  wchar_t         className [] = { L"USurface" };
                 break;
         }
 
-        if (attach && processId == steamProcess)
+        if (attach && processId == g_steamProcess)
                 return;
-        if (! attach && steamProcess == 0)
+        if (! attach && g_steamProcess == 0)
                 return;
 
         /*
@@ -400,21 +291,80 @@ static  wchar_t         className [] = { L"USurface" };
          * for example a Steam window opened by explorer.exe.
          */
 
-        if (serverName != 0 && attach && ! filterDisabled) {
-                if (steamProcess != 0)
-                        callFilterId (steamProcess, "FilterUnload");
-
-                if (! callFilterId (processId, "SteamFilter", serverName))
-                        return;
-
-                /*
-                 * The injection succeeded.
-                 */
-
-                steamProcess = processId;
-        } else {
+        if (! attach || g_filterDisabled) {
                 callFilterId (processId, "FilterUnload");
-                steamProcess = 0;
+                g_steamProcess = 0;
+                return;
+        }
+
+        if (g_steamProcess != 0)
+                callFilterId (g_steamProcess, "FilterUnload");
+
+        Profile         current (g_profileId, & g_settings);
+
+        if (! callFilterId (processId, "SteamFilter", current.filter ()))
+                return;
+
+        /*
+         * The injection succeeded.
+         */
+
+        g_steamProcess = processId;
+}
+
+/**
+ * Set the enable state for the filter.
+ */
+
+void setFilter (bool state) {
+        g_settings [DISABLE_VALUE] <<= (state ? L"1" : 0);
+
+        /*
+         * Cause the filter setting to be applied to any existing filter
+         * instance.
+         */
+
+        g_filterDisabled = state;
+        steamPoll (! state);
+}
+
+/**
+ * Get the current enable state for the filter.
+ */
+
+bool getFilter (void) {
+        bool            value;
+        g_settings [DISABLE_VALUE] >>= value;
+        return value;
+}
+
+/**
+ * Add a set of strings from resources into a combo-box or list box.
+ */
+
+void addStrings (HWND window, UINT control, UINT start) {
+        HWND            ctrl = GetDlgItem (window, control);
+
+        /*
+         * Add strings to the dialog's combo box
+         */
+
+        wchar_t         text [1024];
+        unsigned long   id = start;
+        HINSTANCE       self = GetModuleHandle (0);
+
+        for (;; ++ id) {
+                int             length;
+                length = LoadStringW (self, id,
+                                      text, ARRAY_LENGTH (text));
+                if (length == 0)
+                        break;
+
+                LRESULT         result;
+                result = SendMessage (ctrl, CB_ADDSTRING, 0, (LPARAM) text);
+
+                if (result == LB_ERR)
+                        break;
         }
 }
 
@@ -486,6 +436,7 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
 
                 Hyperlink :: attach (window, IDC_SITE);
                 Hyperlink :: attach (window, IDC_AUTHOR);
+                Hyperlink :: attach (window, IDC_FEEDBACK);
                 break;
             }
 
@@ -508,6 +459,7 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
                 switch (item) {
                 case IDC_SITE:
                 case IDC_AUTHOR:
+                case IDC_FEEDBACK:
                 case IDOK:
                 case IDB_UPGRADE:
                         if (code != BN_CLICKED)
@@ -529,8 +481,8 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
                 }
 
                 DestroyWindow (window);
-                if (window == aboutWindow)
-                        aboutWindow = 0;
+                if (window == g_aboutWindow)
+                        g_aboutWindow = 0;
 
                 if (item == IDB_UPGRADE)
                         runCommand (L"wscript.exe", L"setfilter.js upgrade");
@@ -552,13 +504,13 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
  */
 
 void showAbout (void) {
-        if (aboutWindow != 0) {
-                SetFocus (aboutWindow);
+        if (g_aboutWindow != 0) {
+                SetFocus (g_aboutWindow);
                 return;
         }
 
-        wchar_t       * nextVersion;
-        nextVersion = getSetting (LIMIT_SETTINGS, VERSION_VALUE);
+        wchar_t       * nextVersion = 0;
+        g_settings [VERSION_VALUE] >>= nextVersion;
 
         wchar_t       * dialog = MAKEINTRESOURCE (IDD_ABOUT);
         bool            upgrade = false;
@@ -571,10 +523,10 @@ void showAbout (void) {
                  * the like).
                  */
 
-                int             diff = wcscmp (nextVersion, appVer);
+                int             diff = wcscmp (nextVersion, g_appVer);
                 if (diff == 0)
                         break;
-                if (diff < 0 && wcslen (nextVersion) <= wcslen (appVer))
+                if (diff < 0 && wcslen (nextVersion) <= wcslen (g_appVer))
                         break;
 
                 upgrade = true;
@@ -582,27 +534,49 @@ void showAbout (void) {
                 break;
         }
 
-        aboutWindow = CreateDialogW (GetModuleHandle (0), dialog, 0, aboutProc);
-        if (aboutWindow == 0)
+        free (nextVersion);
+
+        g_aboutWindow = CreateDialogW (GetModuleHandle (0), dialog, 0, aboutProc);
+        if (g_aboutWindow == 0)
                 return;
 
         wchar_t         text [1024];
-        GetDlgItemTextW (aboutWindow, IDC_APPNAME, text, ARRAY_LENGTH (text));
+        GetDlgItemTextW (g_aboutWindow, IDC_APPNAME, text, ARRAY_LENGTH (text));
 
         wcscat_s (text, ARRAY_LENGTH (text), L" ");
-        wcscat_s (text, ARRAY_LENGTH (text), appVer);
+        wcscat_s (text, ARRAY_LENGTH (text), g_appVer);
 
-        SetDlgItemTextW (aboutWindow, IDC_APPNAME, text);
+        SetDlgItemTextW (g_aboutWindow, IDC_APPNAME, text);
 
-        ShowWindow (aboutWindow, SW_SHOW);
+        ShowWindow (g_aboutWindow, SW_SHOW);
 }
 
 /**
- * Dialog procedure for the server picker.
+ * Enable the right buttons in the profile dialog, since the detect and upload
+ * buttons overlay each other in the dialog template and we only want one to be
+ * visible at a time.
  */
 
-INT_PTR CALLBACK pickProc (HWND window, UINT message, WPARAM wparam,
-                           LPARAM lparam) {
+void setProfileButtons (HWND window, int index) {
+        if (index == Profile :: g_custom) {
+                ShowWindow (GetDlgItem (window, IDC_AUTODETECT), SW_HIDE);
+                ShowWindow (GetDlgItem (window, IDC_UPLOAD), SW_SHOW);
+                return;
+        }
+        
+        ShowWindow (GetDlgItem (window, IDC_UPLOAD), SW_HIDE);
+
+        HWND            control = GetDlgItem (window, IDC_AUTODETECT);
+        ShowWindow (control, SW_SHOW);
+        EnableWindow (control, index != Profile :: g_noTraffic);
+}
+
+/**
+ * Profile-selection dialog procedure.
+ */
+
+INT_PTR CALLBACK profileProc (HWND window, UINT message, WPARAM wparam,
+                              LPARAM lparam) {
         switch (message) {
         case WM_INITDIALOG: {
                 /*
@@ -611,9 +585,22 @@ INT_PTR CALLBACK pickProc (HWND window, UINT message, WPARAM wparam,
                  */
 
                 wchar_t         title [1024];
-                LoadString (GetModuleHandle (0), IDS_PICKSERVER,
+                LoadString (GetModuleHandle (0), IDS_PICKPROFILE,
                             title, ARRAY_LENGTH (title));
                 SetWindowText (window, title);
+
+                Hyperlink :: attach (window, IDC_UPDATE_ABOUT);
+                Hyperlink :: attach (window, IDC_FILTER_ABOUT);
+
+                addStrings (window, IDCB_PROFILE, IDS_PROFILENAME);
+
+                HWND            sel = GetDlgItem (window, IDCB_PROFILE);
+                SendMessage (sel, CB_SETCURSEL, g_profileId, 0);
+
+                Profile         current (g_profileId, & g_settings);
+                current.toWindow (window);
+
+                setProfileButtons (window, g_profileId);
                 return 0;
             }
 
@@ -639,110 +626,107 @@ INT_PTR CALLBACK pickProc (HWND window, UINT message, WPARAM wparam,
                 return 0;
         }
 
+
         unsigned short  item = LOWORD (wparam);
         unsigned short  code = HIWORD (wparam);
 
-        if (code != BN_CLICKED)
-                return FALSE;
-
-        if (item != IDCANCEL) {
-                HWND            combo = GetDlgItem (window, IDCB_PICKER);
-                LRESULT         result;
-                result = SendMessage (combo, CB_GETCURSEL, 0, 0);
-
-                /*
-                 * If there's no selection, use the text in the edit control
-                 * as the IP or host address to actually filter. Otherwise map
-                 * the selection index to a string resource with the IP.
-                 */
-
-                wchar_t         text [1024];
-                if (result == CB_ERR) {
-                        GetWindowText (combo, text, ARRAY_LENGTH (text));
-                } else {
-                        LoadStringW (GetModuleHandle (0), IDS_ADDRESS0 + result,
-                                     text, ARRAY_LENGTH (text));
+        switch (code) {
+        case BN_CLICKED: {
+                Hyperlink     * link = Hyperlink :: at (window, item);
+                if (link != 0) {
+                        runCommand (link->link ());
+                        return 0;
                 }
 
-                setSetting (LIMIT_SETTINGS, SERVER_VALUE, text);
+                if (item == IDC_UPDATE)
+                        return 0;
 
-                if (serverName != 0)
-                        free (serverName);
-                serverName = wcsdup (text);
+                if (item == IDC_AUTODETECT) {
+                        /*
+                         * Write to the "temp" profile, then load it into the
+                         * window context.
+                         */
 
+                        runCommand (L"wscript.exe", L"setfilter.js", true);
+
+                        Profile         current (Profile :: g_temp, & g_settings);
+                        current.toWindow (window, false);
+                        return 0;
+                }
+                if (item == IDC_UPLOAD) {
+                        /*
+                         * Only enabled for the "custom" profile.
+                         */
+
+                        SetCursor (LoadCursor (0, IDC_WAIT));
+                        runCommand (L"wscript.exe", L"setfilter.js upload", true);
+                        return 0;
+                }
+
+                break;
+            }
+
+        case CBN_SELCHANGE: {
                 /*
-                 * Force the filter setting to be reapplied to any existing
-                 * active filter.
+                 * Switch the current profile.
                  */
 
-                steamProcess = 0;
+                int             index;
+                index = (int) SendMessage ((HWND) lparam, CB_GETCURSEL, 0, 0);
+
+                Profile         change (index, & g_settings);
+                change.toWindow (window);
+                setProfileButtons (window, index);
+                return 0;
+            }
+
+        default:
+                return FALSE;
+        }
+
+        if (item != IDCANCEL) {
+                /*
+                 * Save the current profile.
+                 */
+
+                HWND            control = GetDlgItem (window, IDCB_PROFILE);
+                int             index;
+                index = (int) SendMessage (control, CB_GETCURSEL, 0, 0);
+
+                Profile         change (index, & g_settings);
+
+                change.fromWindow (window);
+                change.toRegistry ();
+
+                g_profileId = index;
+                g_settings [PROFILE_VALUE] <<= g_profileId;
+
+                steamPoll (false);
+                steamPoll (true);
         }
 
         DestroyWindow (window);
-        if (window == pickWindow)
-                pickWindow = 0;
+        if (window == g_profileWindow)
+                g_profileWindow = 0;
 
-        return FALSE;
+        return 0;
 }
 
 /**
- * Show the server picker.
+ * Show the profile-selection dialog.
  */
 
-void showPicker (void) {
-        if (pickWindow != 0) {
-                SetFocus (pickWindow);
+void showProfile (void) {
+        if (g_profileWindow != 0) {
+                SetFocus (g_profileWindow);
                 return;
         }
 
         HMODULE         self = GetModuleHandle (0);
-        pickWindow = CreateDialogW (self, MAKEINTRESOURCE (IDD_SERVERPICKER),
-                                    0, pickProc);
+        g_profileWindow = CreateDialogW (self, MAKEINTRESOURCE (IDD_PROFILE), 0,
+                                         profileProc);
 
-        if (pickWindow == 0)
-                return;
-
-        HWND            combo = GetDlgItem (pickWindow, IDCB_PICKER);
-
-        /*
-         * Add strings to the dialog's combo box
-         */
-
-        wchar_t         text [1024];
-        unsigned long   id = IDS_SERVER0;
-        unsigned long   defaultId = ~ 0UL;
-
-        for (;; ++ id) {
-                unsigned long   serverId = id - IDS_SERVER0 + IDS_ADDRESS0;
-                int             length;
-                length = LoadStringW (self, serverId,
-                                      text, ARRAY_LENGTH (text));
-                if (length == 0)
-                        break;
-
-                bool            isDefault = serverName != 0 &&
-                                            wcscmp (text, serverName) == 0;
-
-                length = LoadStringW (self, id, text, ARRAY_LENGTH (text));
-                if (length == 0)
-                        break;
-
-                LRESULT         result;
-                result = SendMessage (combo, CB_ADDSTRING, 0, (LPARAM) text);
-
-                if (result == CB_ERR)
-                        break;
-
-                if (isDefault)
-                        defaultId = result;
-        }
-
-        if (defaultId == ~ 0UL) {
-                SendMessage (combo, WM_SETTEXT, 0, (LPARAM) serverName);
-        } else
-                SendMessage (combo, CB_SETCURSEL, defaultId, 0);
-
-        ShowWindow (pickWindow, SW_SHOW);
+        ShowWindow (g_profileWindow, SW_SHOW);
 }
 
 /**
@@ -826,8 +810,8 @@ LRESULT CALLBACK windowProc (HWND window, UINT message, WPARAM wparam,
                         setFilter ((info.fState & MFS_CHECKED) != 0);
                         break;
 
-                case ID_CONTEXT_SERVER:
-                        showPicker ();
+                case ID_PROFILE_PICKER:
+                        showProfile ();
                         break;
 
                 default:
@@ -854,18 +838,18 @@ wchar_t * getAppPath (void) {
         if (length == 0)
                 return 0;
 
-        appPath = (wchar_t *) malloc ((length + 1) * sizeof (wchar_t));
-        wcscpy_s (appPath, length + 1, path);
+        g_appPath = (wchar_t *) malloc ((length + 1) * sizeof (wchar_t));
+        wcscpy_s (g_appPath, length + 1, path);
 
         /*
          * While we're at it, extract the actual app version string.
          */
 
         unsigned long   handle = 0;
-        unsigned long   size = GetFileVersionInfoSize (appPath, & handle);
+        unsigned long   size = GetFileVersionInfoSize (g_appPath, & handle);
 
         void          * mem = malloc (size);
-        GetFileVersionInfoW (appPath, handle, size, mem);
+        GetFileVersionInfoW (g_appPath, handle, size, mem);
 
         VS_FIXEDFILEINFO * info;
         UINT            infoLength = 0;
@@ -879,10 +863,10 @@ wchar_t * getAppPath (void) {
         wsprintfW (path, L"%d.%d.%d.%d", major, minor, build, rev);
 
         length = wcslen (path) + 1;
-        appVer = (wchar_t *) malloc (length * sizeof (wchar_t));
-        wcscpy_s (appVer, length, path);
+        g_appVer = (wchar_t *) malloc (length * sizeof (wchar_t));
+        wcscpy_s (g_appVer, length, path);
 
-        return appPath;
+        return g_appPath;
 }
 
 
@@ -1061,10 +1045,10 @@ reinitialize:
          * of that in the registry yet, assume it's now.
          */
 
-        upgradeCheckTime = getValue (LIMIT_SETTINGS, TIMESTAMP_VALUE);
-        if (upgradeCheckTime == 0) {
-                GetSystemTimeAsFileTime ((FILETIME *) & upgradeCheckTime);
-                setValue (LIMIT_SETTINGS, TIMESTAMP_VALUE, & upgradeCheckTime);
+        g_settings [TIMESTAMP_VALUE] >>= g_upgradeCheckTime;
+        if (g_upgradeCheckTime == 0) {
+                GetSystemTimeAsFileTime ((FILETIME *) & g_upgradeCheckTime);
+                g_settings [TIMESTAMP_VALUE] <<= g_upgradeCheckTime;
         }
 
         /*
@@ -1072,11 +1056,10 @@ reinitialize:
          * state of the enable/disable flag.
          */
 
-        wchar_t       * temp = getSetting (LIMIT_SETTINGS, SERVER_VALUE);
-        if (temp != 0)
-                serverName = temp;
+        g_profileId = Profile :: g_home;
+        g_settings [PROFILE_VALUE] >>= g_profileId;
 
-        filterDisabled = getFilter ();
+        g_filterDisabled = getFilter ();
 
         unsigned short  release = 0;
 
@@ -1128,13 +1111,13 @@ reinitialize:
                                 goto reinitialize;
                         }
 
-                        if (aboutWindow != 0 &&
-                            IsDialogMessageW (aboutWindow, & message)) {
+                        if (g_aboutWindow != 0 &&
+                            IsDialogMessageW (g_aboutWindow, & message)) {
                                 continue;
                         }
 
-                        if (pickWindow != 0 &&
-                            IsDialogMessageW (pickWindow, & message)) {
+                        if (g_profileWindow != 0 &&
+                            IsDialogMessageW (g_profileWindow, & message)) {
                                 continue;
                         }
 

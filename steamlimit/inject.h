@@ -37,7 +37,7 @@
  * For globally recording the application's current path.
  */
 
-extern  wchar_t       * appPath;
+extern  wchar_t       * g_appPath;
 
 /**
  * Call into a filter DLL using a process ID, with the name and path of the
@@ -45,7 +45,7 @@ extern  wchar_t       * appPath;
  */
 
 bool callFilterId (unsigned long processId, const char * entryPoint,
-                   wchar_t * param = 0);
+                   const wchar_t * param = 0);
 
 /**@}*/
 #endif  /* ! defined (INJECT_H) */

@@ -97,6 +97,26 @@ function simpleGet (path) {
 
     return xhr;
 }
+/**
+ * Simple wrapper for using the XHR object synchronously to perform a form POST
+ * to send data to the GAE service.
+ */
+
+function simplePost (path) {
+    if (path.substr (0, 7) !== "http://")
+        path = base + path;
+
+    xhr.open ("POST", path, false);
+    xhr.setRequestHeader ("User-Agent", "steam-limiter/" + version);
+
+    try {
+        xhr.send ();
+    } catch (e) {
+        return null;
+    }
+
+    return xhr;
+}
 
 /**
  * Simple JSON extractor for Windows Script. There's no native JSON here, but
@@ -166,6 +186,31 @@ function deleteFile (path) {
     }
 }
 
+/**
+ * Keep the current profile updated if it's set to update.
+ */
+
+function updateProfile () {
+    var profile = shell.RegRead (regPath + "Profile");
+    profile = String.fromCharCode (profile + 64) + "\\";
+
+    try {
+      var update = shell.RegRead (regPath + profile + "Update");
+
+      /*
+       * If we get here the value is set, so we can update the filter if the
+       * location is still the same. If the profile is completely wrong, it's
+       * debatable whether to correct it or not but for safety now I'm not
+       * going to.
+       */
+
+      if (shell.RegRead (regPath + profile + "ISP") == bundle.ispname) {
+        shell.RegWrite (regPath + profile + "Filter", bundle.filterrule);
+        shell.RegWrite (regPath + profile + "Country", bundle.country);
+      }
+    } catch (e) {
+    }
+}
 
 /*
  * Grab a bunch of data from the webservice; ask for it in JSON, do a simple
@@ -178,10 +223,39 @@ if (hasArg ("debug")) {
      */
 
     base = "http://localhost:8080/";
+} else if (hasArg ("test")) {
+    /*
+     * Point at an alternate version of the webservice for testing.
+     */
+
+    base = "http://2.steam-limiter.appspot.com/";
 }
 
 if (xhr == undefined)
     WScript.Quit (1);
+
+/*
+ * If asked to, send the current "custom" profile to the webservice.
+ *
+ * Attach the "country" field as a note, although the webservice will
+ * see the incoming country via GAE's internal GeoIP lookup.
+ */
+
+if (hasArg ("upload")) {
+    var profile = "C\\";
+    try {
+      var country = shell.RegRead (regPath + profile + "Country");
+      var isp = shell.RegRead (regPath + profile + "ISP");
+      var filter = shell.RegRead (regPath + profile + "Filter");
+
+      simplePost ("uploadrule?ispname=" + escape (isp) +
+                  "&filterrule=" + escape (filter) +
+                  "&content=" + escape (country));
+    } catch (e) {
+    }
+
+    WScript.Quit (0);
+}
 
 /*
  * Get all the data in a bundle; when developing the webservice I kept all the
@@ -199,7 +273,16 @@ if (hasArg ("show"))
 if (! bundle || ! bundle.latest || ! bundle.filterip)
     WScript.Quit (2);
 
+/*
+ * If for some reason we're working with a down-level webservice that doesn't
+ * send a filter rule...
+ */
+
+bundle.filterrule = bundle.filterrule || bundle.filterip;
+
 if (hasArg ("upgrade")) {
+    updateProfile ();
+
     var current = shell.RegRead (regPath + "LastVersion")
     if (current === bundle.latest)
         WScript.Quit (0);
@@ -230,7 +313,7 @@ if (hasArg ("upgrade")) {
      * We don't need the upgrade package any more, clean it out.
      *
      * In principle it might be a good idea to check here what has happened to
-     * LastVersion/NextVersion, but I'm not just yet.
+     * LastVersion/NextVersion, but I'm not perfectly sure about that just yet.
      */
 
     deleteFile (path);
@@ -238,31 +321,40 @@ if (hasArg ("upgrade")) {
 }
 
 /*
- * So, we're not upgrading and we're just setting things up.
+ * So, we're not upgrading and we're just setting things up
  */
 
 shell.RegWrite (regPath + "NextVersion", bundle.latest);
 
-var setup = hasArg ("setup");
-
 /*
- * Even if we're not explicitly asked to do setup, if there isn't an existing
- * registry setting take care of it.
+ * What happens next depends on whether we're being run by the installer, to
+ * set up the "home" profile, or by the monitor applet to redetect the current
+ * location.
+ *
+ * In the latter case, we always want to write to the "temp" profile, to let
+ * the "cancel" option in the profile dialog work by not committing things (so
+ * the "temp" profile is just a way to pass data back from the script to the
+ * monitor applet, which then writes it where it needs to go).
+ *
+ * The other case like this is where we refresh just the "filter" from the
+ * webservice if the profile is set to update, but that's taken care of above.
  */
 
-if (! setup) {
-    var server;
-    try {
-        server = shell.RegRead (regPath + "Server");
-    } catch (e) {
-    }
-    setup = server === undefined;
+var install = hasArg ("install");
+var profile = install ? "A\\" : "D\\";
+
+if (bundle.ispName !== "Unknown") {
+    shell.RegWrite (regPath + profile + "Filter", bundle.filterrule);
+    shell.RegWrite (regPath + profile + "ISP", bundle.ispname);
+    shell.RegWrite (regPath + profile + "Country", bundle.country);
 }
 
-if (setup && bundle.ispName !== "Unknown") {
-    shell.RegWrite (regPath + "Server", bundle.filterip);
-    shell.RegWrite (regPath + "ISP", bundle.ispname);
-}
+/*
+ * Check and update the current profile as well, just in case.
+ */
+
+if (! install)
+    updateProfile ();
 
 /*
  * Aaaaaand, we're done.

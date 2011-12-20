@@ -91,6 +91,8 @@ static  const wchar_t * lookahead (const wchar_t * from, const wchar_t * to,
 static  wchar_t       * unescape (wchar_t * dest, size_t length,
                                   const wchar_t * from, const wchar_t * to);
 static  wchar_t       * wcsdup (const wchar_t * from, const wchar_t * to);
+static  wchar_t       * wcscatdup (const wchar_t * left, const wchar_t * middle,
+                                   const wchar_t * right);
 
         void            freeInfo (addrinfo * info);
 
@@ -117,6 +119,7 @@ class FilterRules {
 private:
         FilterRule    * m_head;
         FilterRule    * m_tail;
+        wchar_t       * m_pending;
 
         unsigned short  m_defaultPort;
 

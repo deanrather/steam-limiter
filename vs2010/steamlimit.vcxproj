@@ -14,6 +14,7 @@
     <ClCompile Include="..\steamlimit\hyperlink.cpp" />
     <ClCompile Include="..\steamlimit\inject.cpp" />
     <ClCompile Include="..\steamlimit\monitor.cpp" />
+    <ClCompile Include="..\steamlimit\profile.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\steamlimit\monitor.rc" />
@@ -21,6 +22,7 @@
   <ItemGroup>
     <ClInclude Include="..\steamlimit\hyperlink.h" />
     <ClInclude Include="..\steamlimit\inject.h" />
+    <ClInclude Include="..\steamlimit\profile.h" />
     <ClInclude Include="..\steamlimit\resource.h" />
   </ItemGroup>
   <ItemGroup>

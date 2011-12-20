@@ -49,6 +49,7 @@
 
 #define VER_PRODUCTNAME_STR     "SteamLimit"
 #define VER_COMPANYNAME_STR     "Nigel Bree <nigel.bree@gmail.com>"
+#define VER_WEBSITE_STR         "http://steam-limiter.googlecode.com"
 
 #define VER_COPYRIGHT_STR       "Copyright 2011 " VER_COMPANYNAME_STR
 

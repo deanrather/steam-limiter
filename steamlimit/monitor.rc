@@ -68,15 +68,15 @@ BEGIN
     BEGIN
         BLOCK "040904E4"
         BEGIN
+            VALUE "Author",           VER_COMPANYNAME_STR
             VALUE "FileDescription",  "Steam Content Server Monitor"
             VALUE "FileVersion",      VER_FILEVERSION_STR
             VALUE "InternalName",     "Steam Content Server Monitor"
             VALUE "LegalCopyright",   VER_COPYRIGHT_STR
-            VALUE "LegalTrademarks1", ""
-            VALUE "LegalTrademarks2", ""
             VALUE "OriginalFilename", "STEAMLIMITER.EXE"
             VALUE "ProductName",      VER_PRODUCTNAME_STR
             VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
+            VALUE "Website",          VER_WEBSITE_STR
         END
     END
     BLOCK "VarFileInfo"
@@ -119,7 +119,8 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Launch at Windows Login",    ID_CONTEXT_AUTOSTART, CHECKED
         MENUITEM "&Filter Content Servers",     ID_CONTEXT_ENABLED, CHECKED
-        MENUITEM "&Pick Server..."              ID_CONTEXT_SERVER
+        // MENUITEM "&Pick Server..."              ID_CONTEXT_SERVER
+        MENUITEM "&Pick Profile..."             ID_PROFILE_PICKER
         MENUITEM SEPARATOR
         MENUITEM "E&xit",                       ID_CONTEXT_EXIT
     END
@@ -131,37 +132,55 @@ END
 // Dialog
 //
 
-IDD_ABOUT DIALOGEX 0, 0, 200, 44
+IDD_ABOUT DIALOGEX 0, 0, 200, 54
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
 FONT 10, "MS Shell Dlg"
 BEGIN
-    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 2, 200, 10
-    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Button", BS_CENTER | WS_TABSTOP, 0, 10, 200, 10
-    CONTROL "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, "Button", BS_CENTER | WS_TABSTOP, 0, 20, 200, 10
-
-    CONTROL "O&K", IDOK, "Button", BS_DEFPUSHBUTTON | BS_CENTER | WS_TABSTOP, 85, 32, 30, 10
+    CTEXT "Steam Limiter", IDC_APPNAME, 0, 2, 200, 10
+    PUSHBUTTON "http://steam-limiter.googlecode.com", IDC_SITE, 0, 10, 200, 10
+    PUSHBUTTON "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, 0, 20, 200, 10
+    PUSHBUTTON "Send Feedback!|http://steam-limiter.appspot.com/feedback", IDC_FEEDBACK, 0, 30, 200, 10
+    DEFPUSHBUTTON "O&K", IDOK, 85, 42, 30, 10
 END
 
 IDD_ABOUT_UPGRADE DIALOGEX 0, 0, 200, 54
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
 FONT 10, "MS Shell Dlg"
 BEGIN
-    CONTROL "Steam Limiter", IDC_APPNAME, "Static", SS_CENTER, 0, 2, 200, 10
-    CONTROL "http://steam-limiter.googlecode.com", IDC_SITE, "Button", BS_CENTER | WS_TABSTOP, 0, 10, 200, 10
-    CONTROL "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, "Button", BS_CENTER | WS_TABSTOP, 0, 20, 200, 10
-    CONTROL "A new version is available!", 0, "Static", SS_CENTER, 0, 30, 200, 10
+    CTEXT "Steam Limiter", IDC_APPNAME, 0, 2, 200, 10
+    PUSHBUTTON "http://steam-limiter.googlecode.com", IDC_SITE, 0, 10, 200, 10
+    PUSHBUTTON "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, 0, 20, 200, 10
+    CTEXT "A new version is available!", 0, SS_CENTER, 0, 30, 200, 10
 
-    CONTROL "&Upgrade Now", IDB_UPGRADE, "Button", BS_DEFPUSHBUTTON | BS_CENTER | WS_TABSTOP, 25, 42, 50, 10
-    CONTROL "&No Thanks", IDOK, "Button", BS_CENTER, 125, 42, 50, 10
+    DEFPUSHBUTTON "&Upgrade Now", IDB_UPGRADE, 25, 42, 50, 10
+    PUSHBUTTON "&No Thanks", IDOK, 125, 42, 50, 10
 END
 
-IDD_SERVERPICKER DIALOGEX 0, 0, 235, 14
+IDD_PROFILE DIALOGEX 0, 0, 250, 60
 STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP | DS_CENTER
 FONT 10, "MS Shell Dlg"
 BEGIN
-    COMBOBOX IDCB_PICKER, 0, 1, 140, 200, CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_TABSTOP
-    CONTROL "&Cancel", IDCANCEL, "Button", WS_TABSTOP | BS_CENTER, 145, 2, 40, 10
-    CONTROL "&OK", IDOK, "Button", WS_TABSTOP | BS_DEFPUSHBUTTON | BS_CENTER, 190, 2, 40, 10
+    RTEXT "&Pick Profile:", -1, 0, 3, 55, 10
+    COMBOBOX IDCB_PROFILE 57, 1, 80, 200, CBS_DROPDOWNLIST | WS_TABSTOP
+
+    PUSHBUTTON "&Cancel", IDCANCEL, 155, 2, 40, 10
+    DEFPUSHBUTTON "&OK", IDOK, 205, 2, 40, 10
+
+    RTEXT "Countr&y:", -2, 0, 14, 55, 10
+    EDITTEXT IDC_COUNTRY, 57, 14, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
+
+    RTEXT "&ISP:", -3, 0, 25, 55, 10
+    EDITTEXT IDC_ISP, 57, 25, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
+
+    PUSHBUTTON "Filter:|http://code.google.com/p/steam-limiter/wiki/FilterRules", IDC_FILTER_ABOUT, 0, 36, 55, 10, BS_RIGHT
+    RTEXT "&Filter:", -4, -99, 36, 55, 10
+    EDITTEXT IDC_FILTER, 57, 36, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
+
+    PUSHBUTTON "Keep updated:|http://code.google.com/p/steam-limiter/wiki/FilterUpdates", IDC_UPDATE_ABOUT, 0, 47, 55, 10, BS_RIGHT
+    AUTOCHECKBOX "&K", IDC_UPDATE, 57, 47, 10, 10, WS_TABSTOP
+
+    PUSHBUTTON "&Autodetect", IDC_AUTODETECT, 205, 48, 40, 10, WS_TABSTOP
+    PUSHBUTTON "&Upload", IDC_UPLOAD, 205, 48, 40, 10, WS_TABSTOP
 END
 
 /////////////////////////////////////////////////////////////////////////////
@@ -174,14 +193,12 @@ BEGIN
     IDS_APPTITLE        "Steam Content Server Limiter"
     IDS_ABOUT           "About Steam Limiter"
     IDS_PICKSERVER      "Select Server"
+    IDS_PICKPROFILE     "Pick your Profile"
 
-    IDS_SERVER0         "TelstraClear New Zealand"
-    IDS_SERVER0 + 1     "Orcon New Zealand"
-    IDS_SERVER0 + 2     "Snap! New Zealand"
-
-    IDS_ADDRESS0        "203.167.129.4"
-    IDS_ADDRESS0 + 1    "219.88.241.90"
-    IDS_ADDRESS0 + 2    "202.124.127.66"
+    IDS_PROFILENAME     "Disable all traffic"
+    IDS_PROFILENAME + 1 "Home"
+    IDS_PROFILENAME + 2 "Away"
+    IDS_PROFILENAME + 3 "Custom"
 END
 
 #endif    // English (United States) resources

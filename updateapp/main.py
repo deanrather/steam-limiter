@@ -68,7 +68,7 @@ from google.appengine.api import users, xmpp, mail
 code_ui_base = 'http://code.google.com/p/steam-limiter/'
 code_file_base = 'http://steam-limiter.googlecode.com/files/'
 
-latest_version = '0.4.1.0'
+latest_version = '0.5.0.0'
 latest_file = 'steamlimit-' + latest_version + '.exe'
 
 # If I want to map source IPs to ISP names, you'd normally just do some kind of
@@ -392,6 +392,7 @@ class UploadedRule (db.Model):
     filterRule = db.StringProperty ()
     notes = db.StringProperty ()
     source = db.StringProperty ()
+    country = db.StringProperty ()
     timestamp = db.DateTimeProperty (auto_now = True)
 
 # Handle a new-rule suggestion form, intended to support a future automatic
@@ -406,9 +407,13 @@ class UploadRuleHandler (webapp2.RequestHandler):
         rule = self.request.get ('filterrule')
         note = self.request.get ('content')
 
+        country = self.request.headers.get ('X-AppEngine-Country')
+        country = country or 'Unknown'
+
         if rule != '':
             item = UploadedRule (ispName = isp, filterRule = rule, notes = note,
-                                 source = self.request.remote_addr)
+                                 source = self.request.remote_addr,
+                                 country = country)
             item.put ()
 
             notifyOwner (isp + ' ==> ' + rule + '\n' + note, 'rule')

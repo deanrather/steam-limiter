@@ -196,8 +196,8 @@ isps = {
           'filter': '*:27030=steam1.syd7.internode.on.net,49.143.234.14,' },
     13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
           'filter': '*:27030=49.143.234.6,49.143.234.14' },
-    14: { 'name': 'iPrimus Australia', 'server': '180.92.195.130',
-          'filter': '*:27030=180.92.195.130,steam1.syd7.internode.on.net' }
+    14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
+          'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' }
 }
 
 # Simplified writer for templates
@@ -250,7 +250,7 @@ def bundle (self):
     country = self.request.headers.get ('X-AppEngine-Country')
     country = country or 'Unknown'
 
-    logging.info (source + '(country=' + country + ') mapped to ' + '%x' % netblock)
+    logging.info (source + '(country=' + country + ') mapped to ' + '%d' % netblock)
 
     isp = isps.get (netblock);
 
@@ -360,7 +360,7 @@ def notifyOwner (text, kind):
 # Feedback model for the feedback submission form to persist
 
 class Feedback (db.Model):
-    content = db.StringProperty ()
+    content = db.StringProperty (multiline = True)
     source = db.StringProperty ()
     timestamp = db.DateTimeProperty (auto_now = True)
 
@@ -389,8 +389,8 @@ class FeedbackHandler (webapp2.RequestHandler):
 
 class UploadedRule (db.Model):
     ispName = db.StringProperty ()
-    filterRule = db.StringProperty ()
-    notes = db.StringProperty ()
+    filterRule = db.StringProperty (multiline = True)
+    notes = db.StringProperty (multiline = True)
     source = db.StringProperty ()
     country = db.StringProperty ()
     timestamp = db.DateTimeProperty (auto_now = True)

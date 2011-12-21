@@ -54,6 +54,16 @@ var fso = WScript.CreateObject ("Scripting.FileSystemObject");
  * "Optus Customer Network" which are presumably netblocks managed by Optus
  * on behalf of corporate customers rather than consumer ones, and so which
  * we don't need to include.
+ *
+ * iINet, Netspace, Westnet and Adam are often referred to as a block, and the
+ * Netspace name and AS is now assigned to iiNet in the APNIC registry, but
+ * Westnet while being owned by iiNet still has a separate brand (and being
+ * all the way over in WA, potentially different performance) and Adam
+ * Internet's website appears to be quite separate from iiNet.
+ *
+ * For now I'll merge Netspace directly into iiNet but keep Westnet and Adam
+ * separate. Westnet's and iiNet's netblocks are interthreaded quite finely so
+ * if I do later merge them I'd want to actually merge the intervals.
  */
 
 function readFile (file) {
@@ -67,10 +77,13 @@ function readFile (file) {
         "AS23655": 2,   /* Snap! */
 
         "AS1221": 10,   /* Telstra */
-        "AS4208": 11,   /* iiNet */
-        "AS4739": 12,   /* Internode */
+        "AS4739": 11,   /* Internode */
+        "AS4802": 12,   /* iiNet (Adelaide) */
+        "AS4854": 12,   /* Netspace Online Systems (Melbourne), now iiNet */
         "AS7474": 13,   /* SingTel Optus */
-        "AS9443": 14    /* iPrimus aka Primus Telecommunications */
+        "AS9443": 14,   /* iPrimus aka Primus Telecommunications */
+        "AS9543": 15,   /* Westnet Internet Services (Perth, WA) */
+        "AS9556": 16    /* Adam Internet Pty Ltd (Adelaide) */
     };
 
     var getId = RegExp ().compile ("AS[0-9]+");

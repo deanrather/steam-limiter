@@ -26,3 +26,7 @@ rem Targeting these Australian ISPs for now since they seem the biggest and
 rem some people from them have installed the limiter tool
 
 findstr /r "Telstra.Pty iiNet Internode Optus Primus" %1 > netblock2.csv
+
+rem Other Australian ISPs, some connected with iiNet various ways
+
+findstr /r /i "Westnet.Internet Netspace.Online Adam.Internet" %1 > netblock3.csv

@@ -186,17 +186,23 @@ isps = {
     # ideal lists here are a bit hard to figure, since there are a mix of
     # filtered and non-filtered servers, and thanks to peering often customers
     # of one ISP can get optimal service from a different peer.
+    # It's hard to tell whether Westnet's netblock really should be merged into
+    # the iiNet one or not, but I'm keeping that separate for now.
 
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
           'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
-    11: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
-    12: { 'name': 'Internode Australia', 'server': '150.101.120.97',
+    11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,111.119.10.2,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2' },
+    12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
           'filter': '*:27030=49.143.234.6,49.143.234.14' },
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' }
+          'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' },
+    15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
+    16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' }
 }
 
 # Simplified writer for templates

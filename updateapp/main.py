@@ -115,17 +115,28 @@ def find_netblock (ip):
     if type (ip) == str:
         ip = stringip_to_number (ip)
 
-    # Binary search or linear? The table's small enough that linear search is
-    # just fine. As it happens the table is sorted so binary search will work
-    # but I'm too lazy to bother given that GAE doesn't need the speed (well,
-    # not given that by doing this in memory we're avoiding the datastore).
+    # Binary search or linear? Now the table is 1200 long, it's worth it to do
+    # a binary search.
 
-    for item in ip_match.ip_table:
-    	if item [0] > ip:
-            return - 1
+    table = ip_match.ip_table
+    low = 0
+    high = len (table) - 1
 
-        if item [1] > ip:
+    while low <= high:
+        mid = (low + high) / 2
+        item = table [mid]
+
+        if item [0] >= ip:
+            # Move down
+            high = mid - 1
+            continue
+
+        if item [1] >= ip:
+            # We have a match
             return item [2]
+
+        # Move up
+        low = mid + 1
 
     return - 1
 
@@ -202,7 +213,21 @@ isps = {
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' }
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
+
+    # Slots 17-29 are reserved for future Australian ISPs
+
+    30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
+          'filter': '*:27030=steam.isgaming.co.za' },
+    31: { 'name': 'webafrica (Cape Town, South Africa)', 'server': '41.185.24.21',
+          'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za' },
+
+    # Slots 32-39 are reserved for future South African ISPs
+
+    # No reverse DNS works for this one but it's definitely in the vodafone.is netblock
+
+    40: { 'name': 'Vodafone Iceland', 'server': '193.4.194.101',
+          'filter': '*:27030=193.4.194.101' }
 }
 
 # Simplified writer for templates

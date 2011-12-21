@@ -198,31 +198,31 @@ gotServerValue:
   StrCmp $0 "203.167.129.4" 0 notTelstra
 
   WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
-	WriteRegStr HKCU "$SETTINGS\C" "ISP" "TelstraClear New Zealand"
-	goto detectHomeProfile
+  WriteRegStr HKCU "$SETTINGS\C" "ISP" "TelstraClear New Zealand"
+  goto detectHomeProfile
 
 notTelstra:
-	StrCmp $0 "219.88.241.90" 0 notOrcon
+  StrCmp $0 "219.88.241.90" 0 notOrcon
 
   WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
-	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Orcon New Zealand"
+  WriteRegStr HKCU "$SETTINGS\C" "ISP" "Orcon New Zealand"
   goto detectHomeProfile
 
 notOrcon:
-	StrCmp $0 "202.124.127.66" 0 notSnap
+  StrCmp $0 "202.124.127.66" 0 notSnap
 
   WriteRegStr HKCU "$SETTINGS\C" "Country" "NZ"
-	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Snap! New Zealand"
+  WriteRegStr HKCU "$SETTINGS\C" "ISP" "Snap! New Zealand"
   goto detectHomeProfile
 
 notSnap:
   /*
-	 * Stick with the custom profile.
-	 */
+   * Stick with the custom profile.
+   */
 	 
-	WriteRegStr HKCU "$SETTINGS\C" "Country" "AU"
-	WriteRegStr HKCU "$SETTINGS\C" "ISP" "Unknown"
-	WriteRegDWORD HKCU $SETTINGS "Profile" 3
+  WriteRegStr HKCU "$SETTINGS\C" "Country" "AU"
+  WriteRegStr HKCU "$SETTINGS\C" "ISP" "Unknown"
+  WriteRegDWORD HKCU $SETTINGS "Profile" 3
 
 detectHomeProfile:
   /*
@@ -240,22 +240,22 @@ detectHomeProfile:
     StrCpy $0 "*:27030=wlgwpstmcon01.telstraclear.co.nz"
     WriteRegStr HKCU "$SETTINGS\A" "Filter" $0
     WriteRegStr HKCU "$SETTINGS\A" "Country" "NZ"
-		WriteRegStr HKCU "$SETTINGS\A" "ISP" "TelstraClear New Zealand"
+    WriteRegStr HKCU "$SETTINGS\A" "ISP" "TelstraClear New Zealand"
 
 setProfile:
   ReadRegDWORD $0 HKCU $SETTINGS "Profile"
   IfErrors 0 finishInstall
-		/*
-	   * If there's an existing profile selection, leave it.
-		 * Otherwise, default to the "home" profile.
-		 */
+    /*
+     * If there's an existing profile selection, leave it.
+     * Otherwise, default to the "home" profile.
+     */
 
     WriteRegDWORD HKCU $SETTINGS "Profile" 1
 
 finishInstall:
   /*
-	 * Remove all the pre-v0.4 settings.
-	 */
+   * Remove all the pre-v0.4 settings.
+   */
 
   DeleteRegKey HKLM $SETTINGS
 	

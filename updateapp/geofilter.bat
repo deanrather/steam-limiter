@@ -29,4 +29,10 @@ findstr /r "Telstra.Pty iiNet Internode Optus Primus" %1 > netblock2.csv
 
 rem Other Australian ISPs, some connected with iiNet various ways
 
-findstr /r /i "Westnet.Internet Netspace.Online Adam.Internet" %1 > netblock3.csv
+findstr /r "Westnet.Internet Netspace.Online Adam.Internet" %1 > netblock3.csv
+
+rem South Africa/Iceland - AS3741 is Internet Solutions LIR but it's in the
+rem registry as plain "IS" which isn't helpful, AS12969 is Vodafone Iceland
+rem under an Icelandic name
+
+findstr /r "webafrica AS3741 AS12969" %1 > netblock4.csv

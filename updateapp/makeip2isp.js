@@ -78,12 +78,17 @@ function readFile (file) {
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */
-        "AS4802": 12,   /* iiNet (Adelaide) */
+        "AS4802": 12,   /* iiNet (Adelaide, SA) */
         "AS4854": 12,   /* Netspace Online Systems (Melbourne), now iiNet */
         "AS7474": 13,   /* SingTel Optus */
         "AS9443": 14,   /* iPrimus aka Primus Telecommunications */
         "AS9543": 15,   /* Westnet Internet Services (Perth, WA) */
-        "AS9556": 16    /* Adam Internet Pty Ltd (Adelaide) */
+        "AS9556": 16,   /* Adam Internet Pty Ltd (Adelaide, SA) */
+
+        "AS3741": 30,   /* Internet Solutions (Johannesburg, South Africa) */
+        "AS36943": 31,  /* webafrica (Cape Town, South Africa) */
+
+        "AS12969": 40   /* Vodafone Iceland */
     };
 
     var getId = RegExp ().compile ("AS[0-9]+");

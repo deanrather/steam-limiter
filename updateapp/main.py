@@ -181,6 +181,13 @@ def find_netblock (ip):
 isps = {
     - 1: { 'name': 'Unknown', 'server': '203.167.129.4',
            'filter': '' },
+
+    # Note that most NZ Universities appear to have peering with and/or student
+    # internet provided via Snap! - most I've lumped in as part of Snap! but
+    # Waikato is a special case having an old netblock with a full class B and
+    # it it being set as its own case, just using the same rules as Snap! for
+    # now.
+
     0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
          'filter': '*:27030=wlgwpstmcon01.telstraclear.co.nz' },
     1: { 'name': 'Orcon New Zealand', 'server': '219.88.241.90',
@@ -189,11 +196,11 @@ isps = {
          'filter': '*:27030=202.124.127.66' },
     3: { 'name': 'Slingshot New Zealand', 'server': '119.224.142.146',
          'filter': '*:27030=119.224.142.146' },
+    4: { 'name': 'University of Waikato, New Zealand', 'server': '202.124.127.66',
+         'filter': '*:27030=202.124.127.66' },
 
-    # Slots 3-9 are reserved for more NZ ISPs, such as Slingshot and Telecom
-    # New Zealand and perhaps Vodafone (my understanding is that Slingshot do
-    # have a Steam server but it's not clear what it's named nor whether it is
-    # unmetered).
+    # Slots 5-9 are reserved for more NZ ISPs, such as Telecom New Zealand and
+    # perhaps Vodafone.
 
     # For the Australian ISPs I'm using two servers per ISP to start but the
     # ideal lists here are a bit hard to figure, since there are a mix of
@@ -217,7 +224,7 @@ isps = {
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
 
-    # Slots 17-29 are reserved for future Australian ISPs
+    # Slots 17-29 are reserved for future Australian ISPs or tertiary institutions.
 
     30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
           'filter': '*:27030=steam.isgaming.co.za' },
@@ -226,7 +233,7 @@ isps = {
 
     # Slots 32-39 are reserved for future South African ISPs
 
-    # No reverse DNS works for this one but it's definitely in the vodafone.is netblock
+    # No reverse DNS for this one but it's definitely in the vodafone.is netblock
 
     40: { 'name': 'Vodafone Iceland', 'server': '193.4.194.101',
           'filter': '*:27030=193.4.194.101' }

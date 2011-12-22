@@ -88,6 +88,11 @@ function readFile (file) {
                         /* based on http://bgp.he.net/AS38319 */
 
         "AS9790": 3,    /* CallPlus Services Limited aka Slingshot */
+        "AS681": 4,     /* University of Waikato, a full class B and class C */
+                        /* I am informed that some student services include
+                         * unmetered Steam via Snap!, but Waikato is a special
+                         * case all its own thanks to its large netblock.
+                         */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */

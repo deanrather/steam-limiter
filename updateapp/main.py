@@ -187,6 +187,8 @@ isps = {
          'filter': '*:27030=steam.orcon.net.nz' },
     2: { 'name': 'Snap! New Zealand', 'server': '202.124.127.66',
          'filter': '*:27030=202.124.127.66' },
+    3: { 'name': 'Slingshot New Zealand', 'server': '119.224.142.146',
+         'filter': '*:27030=119.224.142.146' },
 
     # Slots 3-9 are reserved for more NZ ISPs, such as Slingshot and Telecom
     # New Zealand and perhaps Vodafone (my understanding is that Slingshot do

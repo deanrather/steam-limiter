@@ -64,6 +64,10 @@ var fso = WScript.CreateObject ("Scripting.FileSystemObject");
  * For now I'll merge Netspace directly into iiNet but keep Westnet and Adam
  * separate. Westnet's and iiNet's netblocks are interthreaded quite finely so
  * if I do later merge them I'd want to actually merge the intervals.
+ *
+ * Canterbury, VUW, Lincoln and Christchurch Polytechnic all peer with Snap!
+ * and all 3 universities have halls of residence, so I'll add them and skip
+ * the Polytechnic for now.
  */
 
 function readFile (file) {
@@ -77,6 +81,13 @@ function readFile (file) {
         "AS23655": 2,   /* Snap! */
         "AS9432": 2,    /* University of Canterbury, access through Snap! */
                         /* http://www.it.canterbury.ac.nz/web/network/halls_connection.shtml */
+                        /* also see http://bgp.he.net/AS9432 */
+        "AS23905": 2,   /* Victoria University Wellington */
+                        /* based on http://bgp.he.net/AS23905 */
+        "AS38319": 2,   /* Lincoln University Canterbury */
+                        /* based on http://bgp.he.net/AS38319 */
+
+        "AS9790": 3,    /* CallPlus Services Limited aka Slingshot */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */

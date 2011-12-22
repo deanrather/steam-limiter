@@ -75,6 +75,8 @@ function readFile (file) {
         "AS17746": 1,   /* Orcon */
         "AS55454": 1,
         "AS23655": 2,   /* Snap! */
+        "AS9432": 2,    /* University of Canterbury, access through Snap! */
+                        /* http://www.it.canterbury.ac.nz/web/network/halls_connection.shtml */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */

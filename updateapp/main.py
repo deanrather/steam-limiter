@@ -185,7 +185,7 @@ isps = {
     # Note that most NZ Universities appear to have peering with and/or student
     # internet provided via Snap! - most I've lumped in as part of Snap! but
     # Waikato is a special case having an old netblock with a full class B and
-    # it it being set as its own case, just using the same rules as Snap! for
+    # it is being set as its own case, just using the same rules as Snap! for
     # now.
 
     0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
@@ -198,9 +198,11 @@ isps = {
          'filter': '*:27030=119.224.142.146' },
     4: { 'name': 'University of Waikato, New Zealand', 'server': '202.124.127.66',
          'filter': '*:27030=202.124.127.66' },
+    5: { 'name': 'Xnet/WorldxChange New Zealand', 'server': '58.28.25.145',
+         'filter': '*:27030=58.28.25.145' },
 
-    # Slots 5-9 are reserved for more NZ ISPs, such as Telecom New Zealand and
-    # perhaps Vodafone.
+    # Slots 6-9 are reserved for more NZ ISPs, such as Telecom New Zealand and
+    # Vodafone.
 
     # For the Australian ISPs I'm using two servers per ISP to start but the
     # ideal lists here are a bit hard to figure, since there are a mix of

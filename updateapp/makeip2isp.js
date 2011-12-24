@@ -93,6 +93,7 @@ function readFile (file) {
                          * unmetered Steam via Snap!, but Waikato is a special
                          * case all its own thanks to its large netblock.
                          */
+        "AS17435": 5,   /* Xnet aka Worldxchange */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */

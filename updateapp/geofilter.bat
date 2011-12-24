@@ -20,7 +20,7 @@ rem Docs spreadsheet to play with; I did this to confirm the specific ASN
 rem codes used for the ISPs, since they sometimes have multiple assigned
 rem numbers; mapping the ASxxx numbers to an internal ID seems simplest,
 
-findstr /r "TelstraClear Orcon Snap.Internet Canterbury Victoria.University CallPlus of.Waikato" %1 >netblock.csv
+findstr /r "TelstraClear Orcon Snap.Internet Canterbury Victoria.University CallPlus of.Waikato WorldxChange" %1 >netblock.csv
 
 rem Targeting these Australian ISPs for now since they seem the biggest and
 rem some people from them have installed the limiter tool

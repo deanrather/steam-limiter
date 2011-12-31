@@ -338,12 +338,16 @@ bool FilterRule :: parseReplace (const wchar_t * from, const wchar_t * to,
         } else
                 to = port;
 
-        wchar_t         text [40];
+        wchar_t         text [120];
         from = unescape (text, ARRAY_LENGTH (text), from, to);
         if (from == 0) {
                 free (mem);
                 return false;
         }
+
+        /*
+         * Filter leading whitespace.
+         */
 
         for (;;) {
                 /*
@@ -377,6 +381,30 @@ bool FilterRule :: parseReplace (const wchar_t * from, const wchar_t * to,
                 case '\t':
                 case ' ':
                         ++ from;
+                        continue;
+
+                default:
+                        break;
+                }
+
+                break;
+        }
+
+        /*
+         * Filter trailing whitespace as well, since getaddrinfo treats it as
+         * part of the name to resolve.
+         */
+
+        wchar_t       * end = text + wcslen (text);
+        for (;;) {
+
+                wchar_t         ch = * -- end;
+                switch (ch) {
+                case '\n':
+                case '\r':
+                case '\t':
+                case ' ':
+                        * end = 0;
                         continue;
 
                 default:

@@ -198,10 +198,11 @@ struct hostent * WSAAPI gethostHook (const char * name) {
 
 static  hostent         result;
 static  unsigned long   addr;
+static  unsigned long * addrList [2] = { & addr };
 
         addr = replace->sin_addr.S_un.S_addr;
         result.h_addrtype = AF_INET;
-        result.h_addr_list = (char **) & addr;
+        result.h_addr_list = (char **) addrList;
         result.h_aliases = 0;
         result.h_length = sizeof (addr);
         result.h_name = "remapped.local";

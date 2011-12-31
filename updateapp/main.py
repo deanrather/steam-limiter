@@ -68,7 +68,7 @@ from google.appengine.api import users, xmpp, mail
 code_ui_base = 'http://code.google.com/p/steam-limiter/'
 code_file_base = 'http://steam-limiter.googlecode.com/files/'
 
-latest_version = '0.5.0.0'
+latest_version = '0.5.1.0'
 latest_file = 'steamlimit-' + latest_version + '.exe'
 
 # If I want to map source IPs to ISP names, you'd normally just do some kind of
@@ -231,7 +231,7 @@ isps = {
     30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
           'filter': '*:27030=steam.isgaming.co.za' },
     31: { 'name': 'webafrica (Cape Town, South Africa)', 'server': '41.185.24.21',
-          'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za' },
+          'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za' },
 
     # Slots 32-39 are reserved for future South African ISPs
 

@@ -180,13 +180,14 @@ def find_netblock (ip):
 
 isps = {
     - 1: { 'name': 'Unknown', 'server': '203.167.129.4',
-           'filter': '' },
+           'filter': '# No specific content server for your ISP' },
 
     # Note that most NZ Universities appear to have peering with and/or student
     # internet provided via Snap! - most I've lumped in as part of Snap! but
     # Waikato is a special case having an old netblock with a full class B and
     # it is being set as its own case, just using the same rules as Snap! for
-    # now.
+    # now. I'll call it Lightstream (which is a semi-commercial spinoff used
+    # for student internet) since that's probably most useful.
 
     0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
          'filter': '*:27030=wlgwpstmcon01.telstraclear.co.nz' },
@@ -196,13 +197,18 @@ isps = {
          'filter': '*:27030=202.124.127.66' },
     3: { 'name': 'Slingshot New Zealand', 'server': '119.224.142.146',
          'filter': '*:27030=119.224.142.146' },
-    4: { 'name': 'University of Waikato, New Zealand', 'server': '202.124.127.66',
+    4: { 'name': 'Lightstream, Waikato New Zealand', 'server': '202.124.127.66',
          'filter': '*:27030=202.124.127.66' },
     5: { 'name': 'Xnet/WorldxChange New Zealand', 'server': '58.28.25.146',
          'filter': '*:27030=58.28.25.146' },
+    6: { 'name': 'ACSData, Wellington NZ', 'server': '0.0.0.0',
+         'filter': '# No known unmetered Steam server' },
+    7: { 'name': 'Vodafone New Zealand', 'server': '0.0.0.0',
+         'filter': '# No known unmetered Steam server' },
+    8: { 'name': 'Telecom/XTRA New Zealand', 'server': '0.0.0.0',
+         'filter': '# No known unmetered Steam server' },
 
-    # Slots 6-9 are reserved for more NZ ISPs, such as Telecom New Zealand and
-    # Vodafone.
+    # Slot 9 reserved for another NZ ISP
 
     # For the Australian ISPs I'm using two servers per ISP to start but the
     # ideal lists here are a bit hard to figure, since there are a mix of
@@ -214,7 +220,7 @@ isps = {
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
           'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
     11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=49.143.234.14,111.119.10.2,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2' },
+          'filter': '*:27030=49.143.234.14,111.119.10.2,steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2,steam.cdn.on.net' },
     12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
@@ -222,9 +228,9 @@ isps = {
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
           'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' },
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
+          'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,steam1.syd7.internode.on.net' },
 
     # Slots 17-29 are reserved for future Australian ISPs or tertiary institutions.
 
@@ -238,7 +244,17 @@ isps = {
     # No reverse DNS for this one but it's definitely in the vodafone.is netblock
 
     40: { 'name': 'Vodafone Iceland', 'server': '193.4.194.101',
-          'filter': '*:27030=193.4.194.101' }
+          'filter': '*:27030=193.4.194.101' },
+
+    # Regularly installs turn up from Google netblocks; possibly this is part
+    # of sandboxed malware scanning of Google Code downloads, but equally for
+    # all I know it could be humans.
+
+    50: { 'name': 'Google, Inc', 'server': '0.0.0.0',
+          'filter': '# What Steam server do Google use...?' },
+
+    60: { 'name': 'Comcast Communications', 'server': '0.0.0.0',
+          'filter': '# No known Steam server for Comcast' }
 }
 
 # Simplified writer for templates

@@ -94,6 +94,15 @@ function readFile (file) {
                          * case all its own thanks to its large netblock.
                          */
         "AS17435": 5,   /* Xnet aka Worldxchange */
+        "AS18119": 6,   /* ACSData, a non-retail outfit; according to the
+                         * bgp.he.net data they only peer with TelstraClear in
+                         * NZ but I've had one rule suggestion pointing at the
+                         * Orcon Steam server...?
+                         */
+        "AS7657": 7,    /* Vodafone NZ Ltd */
+        "AS2570": 8,    /* Telecom New Zealand */
+        "AS4771": 8,    /* Netgate (another part of Telecom NZ) */
+        "AS9325": 8,    /* Telecom XTRA */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */
@@ -107,7 +116,59 @@ function readFile (file) {
         "AS3741": 30,   /* Internet Solutions (Johannesburg, South Africa) */
         "AS36943": 31,  /* webafrica (Cape Town, South Africa) */
 
-        "AS12969": 40   /* Vodafone Iceland */
+        "AS12969": 40,  /* Vodafone Iceland */
+
+        /*
+         * Google have a few ASNs but while I've seen a few installs from them
+         * they tend to be in the 15169 block.
+         *
+         * Interestingly, Google do have a signficant presence in Sydney and
+         * the Google servers I tend to end up using are in this block.
+         */
+
+        "AS15169": 50,  /* Google Inc. */
+
+        /*
+         * I've seen a few installs from Comcast, but they have a LOT of ASNs
+         * and presumably they represent some geographical diversity inside the
+         * US. So, I'll add their netblocks over time as I learn more about how
+         * to handle Comcast.
+         */
+
+        "AS21508": 60,  /* actually seen this one used */
+        "AS33490": 60   /* actually seen this one used */
+
+/* Holding off on enabling all of these until I know more
+        "AS7015": 60,
+        "AS7016": 60,
+        "AS7725": 60,
+        "AS7922": 60,
+        "AS13367": 60,
+        "AS20214": 60,
+        "AS22258": 60,
+        "AS23266": 60,
+        "AS33287": 60,
+        "AS33489": 60,
+        "AS33491": 60,
+        "AS33650": 60,
+        "AS33651": 60,
+        "AS33652": 60,
+        "AS33653": 60,
+        "AS33654": 60,
+        "AS33655": 60,
+        "AS33656": 60,
+        "AS33657": 60,
+        "AS33660": 60,
+        "AS33661": 60,
+        "AS33662": 60,
+        "AS33663": 60,
+        "AS33664": 60,
+        "AS33665": 60,
+        "AS33666": 60,
+        "AS33668": 60,
+        "AS36732": 60,
+        "AS36733": 60
+*/
     };
 
     var getId = RegExp ().compile ("AS[0-9]+");

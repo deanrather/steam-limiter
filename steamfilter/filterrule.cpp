@@ -813,19 +813,31 @@ bool FilterRules :: append (const wchar_t * specs) {
  * address is quickly rendered as text for matching.
  */
 
-bool FilterRules :: match (const sockaddr_in * name, sockaddr_in ** replace) {
+bool FilterRules :: match (const sockaddr_in * name, void * module,
+                           sockaddr_in ** replace) {
         if (! l_initFuncs ())
                 return false;
 
         unsigned short  port = ntohs (name->sin_port);
-        char            example [24];
+        char            example [80];
+        char          * temp = example;
 
-        wsprintfA (example, "%d.%d.%d.%d:%d",
-                        name->sin_addr.S_un.S_un_b.s_b1,
-                        name->sin_addr.S_un.S_un_b.s_b2,
-                        name->sin_addr.S_un.S_un_b.s_b3,
-                        name->sin_addr.S_un.S_un_b.s_b4,
-                        port);
+        if (module != 0) {
+                size_t          len;
+                len = GetModuleFileNameA ((HMODULE) module, temp,
+                                          sizeof (example));
+                temp += len;
+                * temp ++ = '!';
+        }
+
+        wsprintfA (temp, "%d.%d.%d.%d:%d",
+                   name->sin_addr.S_un.S_un_b.s_b1,
+                   name->sin_addr.S_un.S_un_b.s_b2,
+                   name->sin_addr.S_un.S_un_b.s_b3,
+                   name->sin_addr.S_un.S_un_b.s_b4,
+                   port);
+
+        OutputDebugStringA (example);
 
         EnterCriticalSection (l_filterLock);
 

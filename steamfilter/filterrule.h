@@ -135,7 +135,7 @@ public:
         bool            append (const wchar_t * rules);
         bool            install (const wchar_t * rules);
 
-        bool            match (const sockaddr_in * name,
+        bool            match (const sockaddr_in * name, void * module,
                                sockaddr_in ** replace);
         bool            match (const char * name,
                                sockaddr_in ** replace);

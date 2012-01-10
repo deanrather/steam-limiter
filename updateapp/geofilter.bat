@@ -21,6 +21,7 @@ rem codes used for the ISPs, since they sometimes have multiple assigned
 rem numbers; mapping the ASxxx numbers to an internal ID seems simplest,
 
 findstr /r "TelstraClear Orcon Snap.Internet Canterbury Victoria.University CallPlus of.Waikato WorldxChange" %1 >netblock.csv
+findstr /r "ADSData Vodafone.NZ Telecom.New Telecom.XTRA Netgate" %1 >>netblock.csv
 
 rem Targeting these Australian ISPs for now since they seem the biggest and
 rem some people from them have installed the limiter tool
@@ -36,3 +37,13 @@ rem registry as plain "IS" which isn't helpful, AS12969 is Vodafone Iceland
 rem under an Icelandic name
 
 findstr /r "webafrica AS3741 AS12969" %1 > netblock4.csv
+
+rem Google, who for some reason account for a few installs (possibly due to
+rem automated malware scanning for Google Code downloads?)
+
+findstr /r "Google,.Inc Google.Inc" %1 > netblock5.csv
+
+rem US ISPs
+rem No idea what to use for these yet, but starting to see installs
+
+findstr /r "Comcast.Cable" %1 > netblock6.csv

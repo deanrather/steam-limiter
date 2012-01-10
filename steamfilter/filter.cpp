@@ -78,22 +78,127 @@ typedef int (WSAAPI * ConnectFunc) (SOCKET s, const sockaddr * name, int namelen
 typedef struct hostent * (WSAAPI * GetHostFunc) (const char * name);
 
 /**
+ * The prototype of the legacy sockets inet_addr () function.
+ */
+
+typedef unsigned long (WSAAPI * inet_addr_func) (const char * addr);
+
+/**
+ * The prototype of the legacy sockets recv () function.
+ */
+
+typedef int   (WSAAPI * RecvFunc) (SOCKET s, char * buf, int len, int flags);
+
+/**
+ * The prototype of the legacy sockets recvfrom () function.
+ */
+
+typedef int   (WSAAPI * RecvFromFunc) (SOCKET s, char * buf, int len, int flags,
+                                       sockaddr * from, int * fromLen);
+
+/**
+ * The prototype of the modern asynchronous WSARecv () function.
+ */
+
+typedef int   (WSAAPI * WSARecvFunc) (SOCKET s, LPWSABUF buffers,
+                                      unsigned long count,
+                                      unsigned long * received,
+                                      unsigned long * flags,
+                                      OVERLAPPED * overlapped,
+                                      LPWSAOVERLAPPED_COMPLETION_ROUTINE handler);
+
+/**
+ * The prototype of WSAGetOverlappedResult (), used with WSASend () and
+ * WSARecv ().
+ */
+
+typedef BOOL  (WSAAPI * WSAGetOverlappedFunc) (SOCKET s, OVERLAPPED * overlapped,
+                                               unsigned long * length, BOOL wait,
+                                               unsigned long * flags);
+
+/**
+ * For representing hooked functions, and wrapping up the hook and unhook
+ * machinery.
+ *
+ * Just a placeholder for now, but I intend to factor the hook machinery into
+ * here and make it a separate file at some point, along with making the hook
+ * attach and detach operations maintain state for easier unhooking.
+ */
+
+struct ApiHook {
+        FARPROC         m_original;
+        FARPROC         m_resume;
+        FARPROC         m_hook;
+        unsigned char   m_save [8];
+        unsigned char   m_thunk [16];
+
+                        ApiHook ();
+                      ~ ApiHook ();
+
+        bool            operator == (int) const { return m_resume == 0; }
+        bool            operator != (int) const { return m_resume != 0; }
+
+        FARPROC         makeThunk (unsigned char * data, size_t length);
+        void            unhook (void);
+
+        bool            attach (void * address, FARPROC hook);
+        bool            attach (void * hook, HMODULE lib, const char * name);
+};
+
+/**
+ * Specialize ApiHook for the function calling signatures.
+ */
+
+template <class F>
+struct Hook : public ApiHook {
+        F               operator * (void) {
+                return (F) m_resume;
+        }
+
+        bool            attach (F hook, HMODULE lib, const char * name);
+};
+
+/**
  * This is the original connect () function, just past the patch area.
  */
 
-ConnectFunc             g_connectResume;
+Hook<ConnectFunc>       g_connectResume;
 
 /**
  * This is the original gethostbyname () function, just past the patch area.
  */
 
-GetHostFunc             g_gethostResume;
+Hook<GetHostFunc>       g_gethostResume;
 
 /**
- * Like htons () but as a macro.
+ * The original inet_addr () function, just past the patch area.
  */
 
-#define SWAP(x)         ((((x) & 0xFF) << 8) | ((x) >> 8))
+Hook<inet_addr_func>    g_inet_addr_resume;
+
+/**
+ * The original recv () function, just past the patch area.
+ */
+
+Hook<RecvFunc>          g_recvResume;
+
+/**
+ * The original recvfrom () function, just past the patch area.
+ */
+
+Hook<RecvFromFunc>      g_recvfromResume;
+
+/**
+ * The original WSARecv () function, just past the patch area.
+ */
+
+Hook<WSARecvFunc>       g_wsaRecvResume;
+
+/**
+ * The original WSAGetOverlappedResult (), just past the patch area.
+ */
+
+Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedResume;
 
 /**
  * The Telstra IP address we're after in network byte order.
@@ -104,12 +209,38 @@ FilterRules     g_rules (27030);
 /**
  * Hook for the connect () function; check if we want to rework it, or just
  * continue on to the original.
+ *
+ * Mainly our aim was to block port 27030 which is the good Steam 'classic' CDN
+ * but Valve have *two* amazingly half-baked and badly designed HTTP download
+ * systems as well. One - "CDN" - uses DNS tricks, while the other one - "CS" -
+ * is rather more nasty, and almost impossible to filter cleanly out from the
+ * legitimate use of HTTP inside Steam - for CS servers only numeric IPs are
+ * passed over HTTP and they aren't parsed by API functions we can hook like
+ * RtlIpv4AddressToStringEx (which exists in Windows XPSP3 even though it's
+ * not documented).
  */
 
 int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
+        /*
+         * Capture the caller's return address so we can map it to a module and
+         * thus a module name, to potentially include in the filter string.
+         *
+         * An alternative to this is to use RtlCaptureStackBacktrace to get the
+         * caller (and potentially more of the stack), but sinec we're x86 only
+         * for now this should do fine.
+         */
+
+        HMODULE         module = 0;
+
+#if     0
+        unsigned long   addr = ((unsigned long *) & s) [- 1];
+        GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                            (LPCWSTR) addr, & module);
+#endif
+
         sockaddr_in   * replace = 0;
         if (name->sa_family != AF_INET ||
-            ! g_rules.match ((const sockaddr_in *) name, & replace)) {
+            ! g_rules.match ((const sockaddr_in *) name, module, & replace)) {
                 /*
                  * Just forward on to the original.
                  */
@@ -211,6 +342,153 @@ static  unsigned long * addrList [2] = { & addr };
 }
 
 /**
+ * For measuring bandwidth.
+ */
+
+class Meter {
+public:
+typedef CRITICAL_SECTION        Mutex;
+
+private:
+        Mutex           m_lock;
+        unsigned long   m_now;
+        unsigned long   m_currentBytes;
+
+        unsigned long   m_last;
+        long long       m_total;
+
+        void            newTick (unsigned long now);
+
+public:
+                        Meter ();
+
+        void            operator += (int bytes);
+};
+
+Meter :: Meter () : m_now (GetTickCount ()), m_currentBytes (0),
+                m_last (0), m_total (0) {
+        InitializeCriticalSection (& m_lock);
+}
+
+void Meter :: newTick (unsigned long now) {
+        unsigned long   delta = now - m_now;
+        if (delta < 1)
+                return;
+
+        unsigned long   bytes = m_currentBytes;
+        m_currentBytes = 0;
+
+        m_total += bytes;
+
+        unsigned long   delta2 = m_now - m_last;
+
+#if     0
+        char            buf [80];
+        wsprintfA (buf, "%d %d %d %X\r\n",
+                   delta, bytes, delta2,
+                   (unsigned long) m_total);
+        OutputDebugStringA (buf);
+#endif
+
+        m_last = m_now;
+        m_now = now;
+}
+
+void Meter :: operator += (int bytes) {
+        if (bytes == SOCKET_ERROR)
+                bytes = 0;
+
+        EnterCriticalSection (& m_lock);
+
+        unsigned long   now = GetTickCount ();
+        newTick (now);
+
+        m_currentBytes += bytes;
+
+        LeaveCriticalSection (& m_lock);
+}
+
+Meter           g_meter;
+
+/**
+ * Hook the recv () API, to measure received bandwidth.
+ *
+ * Most of the time the underlying socket will probably be in non-blocking mode
+ * as any use of this API will be from old code which has had to struggle with
+ * the broken original UNIX sockets API design.
+ */
+
+int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
+        int             result;
+        result = (* g_recvResume) (s, buf, len, flags);
+        g_meter += result;
+        return result;
+}
+
+int WSAAPI recvfromHook (SOCKET s, char * buf, int len, int flags,
+                         sockaddr * from, int * fromLen) {
+        int             result;
+        result = (* g_recvfromResume) (s, buf, len, flags, from, fromLen);
+        g_meter += result;
+        return result;
+}
+
+/**
+ * Hook the WSARecv () API, to measure received bandwidth.
+ *
+ * This is a more interesting case because of the OVERLAPPED option; real, true
+ * asynchronous I/O, and the traditional Steam CDN download does use it. Even
+ * with AIO, there are several wrinkles thanks to the best part of AIO under
+ * Windows, which is completion ports (which Steam doesn't use, although lots
+ * of the serious code we might want to apply this to in future does).
+ *
+ * To deal with capturing overlapped completions fully, we need to also hook
+ * WSAGetOverlappedResult () and probably WSAWaitForMultipleObjects (), which
+ * will give us the option of slicing the end-user's original I/O up using a
+ * custom OVERLAPPED buffer of our own in the slices (useful when we get to
+ * trying to apply a bandwidth limit).
+ */
+
+int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long count,
+                        unsigned long * received, unsigned long * flags,
+                        OVERLAPPED * overlapped,
+                        LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
+        if (overlapped != 0 || handler != 0) {
+                int             result;
+                result = (* g_wsaRecvResume) (s, buffers, count, received, flags,
+                                              overlapped, handler);
+
+                if (result == 0 && overlapped != 0) {
+                        /**
+                         * Synchronous success, process here.
+                         */
+
+                        g_meter += overlapped->InternalHigh;
+                }
+                return result;
+        }
+
+        bool            ignore;
+        ignore = flags != 0 && (* flags & MSG_PEEK) != 0;
+
+        int             result;
+        result = (* g_wsaRecvResume) (s, buffers, count, received, flags,
+                                      overlapped, handler);
+        if (result != SOCKET_ERROR && ! ignore)
+                g_meter += * received;
+        return result;
+}
+
+BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
+                                  unsigned long * length, BOOL wait,
+                                  unsigned long * flags) {
+        BOOL            result;
+        result = (* g_wsaGetOverlappedResume) (s, overlapped, length, wait, flags);
+
+        return result;
+}
+
+/**
  * Write a 32-bit value into the output in Intel byte order.
  */
 
@@ -229,6 +507,7 @@ unsigned char * writeOffset (unsigned char * dest, unsigned long value) {
  * Code-generation stuff.
  */
 
+#define PUSH_IMM8       0x6A
 #define JMP_LONG        0xE9
 #define JMP_SHORT       0xEB
 
@@ -265,10 +544,50 @@ int setFilter (wchar_t * address) {
 }
 
 /**
- * Use the built-in Windows run-time patching system for core DLLs.
+ * Copy some code from a patch target into a thunk.
+ *
+ * This is used if the target doesn't contain the patch NOP; we copy the code
+ * to a temporary area so that when we resume the original function, we call
+ * the relocated code which then branches back to the original flow.
+ *
+ * This relies on being able to measure instruction lengths to a degree to know
+ * how much to relocate; doing this in general for x86 isn't too bad, but since
+ * function entry points are highly idiomatic we probably won't need to solve
+ * the general problem (I've written a full general patcher that does this in
+ * the past, but don't have access to that code anymore).
  */
 
-bool attachHook (void * address, void * newTarget) {
+FARPROC ApiHook :: makeThunk (unsigned char * data, size_t bytes) {
+        memcpy (m_thunk, data, bytes);
+
+        m_thunk [bytes] = JMP_LONG;
+        writeOffset (m_thunk + bytes + 1, m_thunk - data);
+
+        unsigned long   protect = 0;
+        if (! VirtualProtect (m_thunk, sizeof (m_thunk),
+                              PAGE_EXECUTE_READWRITE, & protect))
+                return 0;
+
+        return (FARPROC) & m_thunk;
+}
+
+/**
+ * Use the built-in Windows run-time patching system for core DLLs.
+ *
+ * In almost all cases this works fine; there are a few stray APIs in the Win32
+ * ecosystem where the initial two-byte NOP isn't present (e.g. inet_addr) and
+ * so some form of thunk-based redirection can be needed.
+ *
+ * For the inet_addr case the 5 bytes of regular NOP space is still there, and
+ */
+
+bool ApiHook :: attach (void * address, FARPROC hook) {
+        if (address == 0)
+                return false;
+
+        m_hook = hook;
+        m_original = (FARPROC) address;
+
         /*
          * Check for the initial MOV EDI, EDI two-byte NOP in the target
          * function, to signify the presence of a free patch area.
@@ -279,10 +598,19 @@ bool attachHook (void * address, void * newTarget) {
          */
 
         unsigned char * data = (unsigned char *) address;
-        if (* (unsigned short *) data != MOV_EDI_EDI) {
-                OutputDebugStringA ("SteamFilter: not patchable\n");
+        memcpy (m_save, data - 5, 8);
+        m_resume = 0;
+
+        if (* (unsigned short *) data == MOV_EDI_EDI) {
+                /*
+                 * No need for a thunk, the resume point can be where we want.
+                 */
+
+                m_resume = (FARPROC) (data + 2);
+        } else if (* data == PUSH_IMM8) {
+                m_resume = makeThunk (data, 2);
+        } else
                 return false;
-        }
 
         /*
          * Write a branch to the hook stub over the initial NOP of the target
@@ -301,29 +629,96 @@ bool attachHook (void * address, void * newTarget) {
          */
 
         data [- 5] = JMP_LONG;
-        writeOffset (data - 4, (unsigned char *) newTarget - data);
+        writeOffset (data - 4, (unsigned char *) hook - data);
         * (unsigned short *) data = JMP_SHORT_MINUS5;
+
         return true;
 }
 
 /**
- * Remove an attached hook, based on the address past the detour point.
+ * Add some idiomatic wrapping for using GetProcAddress.
+ */
+
+bool ApiHook :: attach (void * hook, HMODULE lib, const char * name) {
+        FARPROC         func = GetProcAddress (lib, name);
+        if (! func) {
+                OutputDebugStringA ("No function: ");
+                OutputDebugStringA (name);
+                OutputDebugStringA ("\r\n");
+
+                m_resume = 0;
+                return false;
+        }
+
+        if (! attach (func, (FARPROC) hook)) {
+                OutputDebugStringA ("Can't hook: ");
+                OutputDebugStringA (name);
+                OutputDebugStringA ("\r\n");
+
+                m_resume = 0;
+                return false;
+        }
+
+        return true;
+}
+
+/**
+ * Remove an attached hook.
  *
  * In case the target DLL is actually unloaded, the write to the detour point
  * is guarded with a Win32 SEH block to avoid problems with the writes.
  */
 
-void unhook (void * resumeAddress) {
-        if (resumeAddress == 0)
+void ApiHook :: unhook (void) {
+        if (m_resume == 0)
                 return;
 
-        unsigned char * dest = (unsigned char *) resumeAddress - 2;
-
         __try {
-                * (unsigned short *) dest = MOV_EDI_EDI;
-                memset (dest - 5, 0x90, 5);
+                memcpy ((unsigned char *) m_original - 5, m_save, 7);
         } __finally {
+                m_original = m_resume = 0;
         }
+}
+
+/**
+ * Unhook all the hooked functions.
+ */
+
+void unhookAll (void) {
+        g_connectResume.unhook ();
+        g_gethostResume.unhook ();
+        g_inet_addr_resume.unhook ();
+        g_recvResume.unhook ();
+        g_recvfromResume.unhook ();
+        g_wsaRecvResume.unhook ();
+        g_wsaGetOverlappedResume.unhook ();
+}
+
+/**
+ * Simple default constructor.
+ */
+
+ApiHook :: ApiHook () : m_original (0), m_resume (0), m_hook (0) {
+}
+
+/**
+ * Simple default destructor.
+ */
+
+ApiHook :: ~ ApiHook () {
+        unhook ();
+}
+
+/**
+ * Simple attach.
+ *
+ * In principle in future this should lead to the hook being attached to a list
+ * of all currently hooked functions.
+ */
+
+template <class F>
+bool Hook<F> :: attach (F hook, HMODULE lib, const char * name) {
+        return ApiHook :: attach (hook, lib, name);
 }
 
 /**
@@ -347,57 +742,26 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
 
         HMODULE         ws2;
         for (;;) {
-                ws2 = GetModuleHandle (L"WS2_32.DLL");
+                ws2 = GetModuleHandleW (L"WS2_32.DLL");
                 if (ws2 != 0)
                         break;
 
                 Sleep (1000);
         }
 
-        /*
-         * First find the function we're going to patch, and then while we're
-         * there find the address of a utility function to turn a string host
-         * name into a plain address.
-         */
-
-        FARPROC         connFunc = GetProcAddress (ws2, "connect");
-        if (connFunc == 0)
-                return 0;
-
-        FARPROC         gethostFunc = GetProcAddress (ws2, "gethostbyname");
-        if (gethostFunc == 0)
-                return 0;
-
         setFilter (address);
 
-        /*
-         * Actually establish the diversion on the Windows Sockets connect ()
-         * function.
-         */
+        bool            success;
+        success = g_connectResume.attach (connectHook, ws2, "connect") &&
+                  g_gethostResume.attach (gethostHook, ws2, "gethostbyname") &&
+                  g_recvResume.attach (recvHook, ws2, "recv") &&
+                  g_recvfromResume.attach (recvfromHook, ws2, "recvfrom") &&
+                  g_wsaRecvResume.attach (wsaRecvHook, ws2, "WSARecv") &&
+                  g_wsaGetOverlappedResume.attach (wsaGetOverlappedHook,
+                                                   ws2, "WSAGetOverlappedResult");
 
-        g_connectResume = (ConnectFunc) ((char *) connFunc + 2);
-        if (! attachHook (connFunc, connectHook)) {
-                /*
-                 * This path generally indicates that another instance of the
-                 * program has left an old filter DLL attached (should be rare
-                 * in real life, but easy to do accidentally with a debugger).
-                 *
-                 * Returning a distinctive status can trigger a new code path
-                 * in v0.5 which will try and unload the old instance.
-                 */
-
-                return ~ 0UL;
-        }
-
-        g_gethostResume = (GetHostFunc) ((char *) gethostFunc + 2);
-        if (! attachHook (gethostFunc, gethostHook)) {
-                /*
-                 * Back out the connect hook we just attached.
-                 */
-
-                unhook (g_connectResume);
-                g_connectResume = 0;
-
+        if (! success) {
+                unhookAll ();
                 return ~ 0UL;
         }
 
@@ -428,12 +792,7 @@ void removeHook (void) {
         if (g_connectResume == 0)
                 return;
 
-        unhook (g_connectResume);
-        g_connectResume = 0;
-
-        unhook (g_gethostResume);
-        g_gethostResume = 0;
-
+        unhookAll ();
         OutputDebugStringA ("SteamFilter unhooked\n");
 }
 

@@ -207,8 +207,8 @@ isps = {
          'filter': '# No known unmetered Steam server' },
     8: { 'name': 'Telecom/XTRA New Zealand', 'server': '0.0.0.0',
          'filter': '# No known unmetered Steam server' },
-
-    # Slot 9 reserved for another NZ ISP
+    9: { 'name': 'InSPire New Zealand', 'server': '0.0.0.0',
+         'filter': '# Please contribute a server IP for InSPire' },
 
     # For the Australian ISPs I'm using two servers per ISP to start but the
     # ideal lists here are a bit hard to figure, since there are a mix of

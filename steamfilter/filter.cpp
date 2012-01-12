@@ -106,6 +106,21 @@ typedef int   (WSAAPI * WSARecvFunc) (SOCKET s, LPWSABUF buffers,
                                       unsigned long * flags,
                                       OVERLAPPED * overlapped,
                                       LPWSAOVERLAPPED_COMPLETION_ROUTINE handler);
+/*
+ * The prototype of the legacy sockets send () function. 
+ */
+
+typedef int   (WSAAPI * SendFunc) (SOCKET s, const char * buf, int len, int flags);
+
+/*
+ * The prototype of the modern asynchronous WSASend () function. 
+ */
+
+typedef int   (WSAAPI * WSASendFunc) (SOCKET s, LPWSABUF buffers,
+                                      unsigned long count,
+                                      unsigned long * sent, unsigned long flags,
+                                      OVERLAPPED * overlapped,
+                                      LPWSAOVERLAPPED_COMPLETION_ROUTINE handler);
 
 /**
  * The prototype of WSAGetOverlappedResult (), used with WSASend () and
@@ -159,46 +174,18 @@ struct Hook : public ApiHook {
 };
 
 /**
- * This is the original connect () function, just past the patch area.
+ * Hook structures for all the things we want to intercept.
  */
 
-Hook<ConnectFunc>       g_connectResume;
-
-/**
- * This is the original gethostbyname () function, just past the patch area.
- */
-
-Hook<GetHostFunc>       g_gethostResume;
-
-/**
- * The original inet_addr () function, just past the patch area.
- */
-
-Hook<inet_addr_func>    g_inet_addr_resume;
-
-/**
- * The original recv () function, just past the patch area.
- */
-
-Hook<RecvFunc>          g_recvResume;
-
-/**
- * The original recvfrom () function, just past the patch area.
- */
-
-Hook<RecvFromFunc>      g_recvfromResume;
-
-/**
- * The original WSARecv () function, just past the patch area.
- */
-
-Hook<WSARecvFunc>       g_wsaRecvResume;
-
-/**
- * The original WSAGetOverlappedResult (), just past the patch area.
- */
-
-Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedResume;
+Hook<ConnectFunc>       g_connectHook;
+Hook<GetHostFunc>       g_gethostHook;
+Hook<inet_addr_func>    g_inet_addr_Hook;
+Hook<RecvFunc>          g_recvHook;
+Hook<RecvFromFunc>      g_recvfromHook;
+Hook<WSARecvFunc>       g_wsaRecvHook;
+Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedHook;
+Hook<SendFunc>          g_sendHook;
+Hook<WSASendFunc>       g_wsaSendHook;
 
 /**
  * The Telstra IP address we're after in network byte order.
@@ -245,7 +232,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                  * Just forward on to the original.
                  */
 
-                return (* g_connectResume) (s, name, namelen);
+                return (* g_connectHook) (s, name, namelen);
         }
 
         /*
@@ -276,7 +263,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
         temp.sin_addr = replace->sin_addr.S_un.S_addr != 0 ?
                         replace->sin_addr : base->sin_addr;
                 
-        return (* g_connectResume) (s, (sockaddr *) & temp, sizeof (temp));
+        return (* g_connectHook) (s, (sockaddr *) & temp, sizeof (temp));
 }
 
 /**
@@ -292,7 +279,7 @@ struct hostent * WSAAPI gethostHook (const char * name) {
                  * passthrough, then let things slide.
                  */
 
-                return (* g_gethostResume) (name);
+                return (* g_gethostHook) (name);
         }
 
         if (replace == 0 || replace->sin_addr.S_un.S_addr == INADDR_NONE) {
@@ -420,7 +407,7 @@ Meter           g_meter;
 
 int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
         int             result;
-        result = (* g_recvResume) (s, buf, len, flags);
+        result = (* g_recvHook) (s, buf, len, flags);
         g_meter += result;
         return result;
 }
@@ -428,7 +415,7 @@ int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
 int WSAAPI recvfromHook (SOCKET s, char * buf, int len, int flags,
                          sockaddr * from, int * fromLen) {
         int             result;
-        result = (* g_recvfromResume) (s, buf, len, flags, from, fromLen);
+        result = (* g_recvfromHook) (s, buf, len, flags, from, fromLen);
         g_meter += result;
         return result;
 }
@@ -455,7 +442,7 @@ int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long count,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
         if (overlapped != 0 || handler != 0) {
                 int             result;
-                result = (* g_wsaRecvResume) (s, buffers, count, received, flags,
+                result = (* g_wsaRecvHook) (s, buffers, count, received, flags,
                                               overlapped, handler);
 
                 if (result == 0 && overlapped != 0) {
@@ -472,7 +459,7 @@ int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         ignore = flags != 0 && (* flags & MSG_PEEK) != 0;
 
         int             result;
-        result = (* g_wsaRecvResume) (s, buffers, count, received, flags,
+        result = (* g_wsaRecvHook) (s, buffers, count, received, flags,
                                       overlapped, handler);
         if (result != SOCKET_ERROR && ! ignore)
                 g_meter += * received;
@@ -483,9 +470,68 @@ BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
                                   unsigned long * length, BOOL wait,
                                   unsigned long * flags) {
         BOOL            result;
-        result = (* g_wsaGetOverlappedResume) (s, overlapped, length, wait, flags);
+        result = (* g_wsaGetOverlappedHook) (s, overlapped, length, wait, flags);
 
         return result;
+}
+
+bool filterHttpUrl (const char * buf, int length) {
+        if (length < 10)
+                return false;
+        
+        size_t          verb = 0;
+        if (memcmp (buf, "GET /", 5) == 0) {
+                verb = 4;
+        } else if (memcmp (buf, "POST /", 6) == 0)
+                verb = 5;
+
+        if (verb == 0)
+                return false;
+
+        /*
+         * Measure the URL before extracting a temporary copy for the filter
+         * process.
+         */
+
+        const char    * end = (const char *) memchr (buf + verb, ' ', length);
+        size_t          len = end == 0 ? 0 : end - buf;
+        char            temp [128];
+        if (len == 0 || len + 2 >= sizeof (temp))
+                return false;
+
+        memcpy (temp, buf, len);
+        strcpy (temp + len, "\r\n");
+        OutputDebugStringA (temp);
+        temp [len] = 0;
+
+        return strcmp (temp + verb, "/initsession/") == 0;
+}
+
+/**
+ * Hook WSASend and do some basic inspection of the outgoing data.
+ *
+ * The intention here is to allow some crude filtering of HTTP URLs, in a form
+ * that is lower-impact than full proxying. Since like most apps that embed an
+ * HTTP client the entire request is sent in a single write call to the network
+ * stack, we can extract and inspect the requested URL pretty simply.
+ *
+ * Now, in the most general case we'd also want to do connection tracking so we
+ * only really worry about this when it's the first thing sent on a socket. But
+ * since the amount of originated traffic is so small here, we can afford to
+ * just look for the HTTP verbs on every write for now.
+ */
+
+int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
+                        unsigned long * sent, unsigned long flags,
+                        OVERLAPPED * overlapped,
+                        LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
+        if (filterHttpUrl (buffers [0].buf, buffers [0].len)) {
+                OutputDebugStringA ("Blocking HTTP request\r\n");
+                SetLastError (WSAECONNRESET);
+                return SOCKET_ERROR;
+        }
+
+        return (* g_wsaSendHook) (s, buffers, count, sent, flags, overlapped, handler);
 }
 
 /**
@@ -685,13 +731,15 @@ void ApiHook :: unhook (void) {
  */
 
 void unhookAll (void) {
-        g_connectResume.unhook ();
-        g_gethostResume.unhook ();
-        g_inet_addr_resume.unhook ();
-        g_recvResume.unhook ();
-        g_recvfromResume.unhook ();
-        g_wsaRecvResume.unhook ();
-        g_wsaGetOverlappedResume.unhook ();
+        g_connectHook.unhook ();
+        g_gethostHook.unhook ();
+        g_inet_addr_Hook.unhook ();
+        g_recvHook.unhook ();
+        g_recvfromHook.unhook ();
+        g_wsaRecvHook.unhook ();
+        g_wsaGetOverlappedHook.unhook ();
+        g_sendHook.unhook ();
+        g_wsaSendHook.unhook ();
 }
 
 /**
@@ -732,7 +780,7 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
          * being monitored.
          */
 
-        if (g_connectResume != 0)
+        if (g_connectHook != 0)
                 return setFilter (address);
 
         /*
@@ -752,13 +800,14 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
         setFilter (address);
 
         bool            success;
-        success = g_connectResume.attach (connectHook, ws2, "connect") &&
-                  g_gethostResume.attach (gethostHook, ws2, "gethostbyname") &&
-                  g_recvResume.attach (recvHook, ws2, "recv") &&
-                  g_recvfromResume.attach (recvfromHook, ws2, "recvfrom") &&
-                  g_wsaRecvResume.attach (wsaRecvHook, ws2, "WSARecv") &&
-                  g_wsaGetOverlappedResume.attach (wsaGetOverlappedHook,
-                                                   ws2, "WSAGetOverlappedResult");
+        success = g_connectHook.attach (connectHook, ws2, "connect") &&
+                  g_gethostHook.attach (gethostHook, ws2, "gethostbyname") &&
+                  g_recvHook.attach (recvHook, ws2, "recv") &&
+                  g_recvfromHook.attach (recvfromHook, ws2, "recvfrom") &&
+                  g_wsaRecvHook.attach (wsaRecvHook, ws2, "WSARecv") &&
+                  g_wsaGetOverlappedHook.attach (wsaGetOverlappedHook,
+                                                   ws2, "WSAGetOverlappedResult") &&
+                  g_wsaSendHook.attach (wsaSendHook, ws2, "WSASend");
 
         if (! success) {
                 unhookAll ();
@@ -789,7 +838,7 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
  */
 
 void removeHook (void) {
-        if (g_connectResume == 0)
+        if (g_connectHook == 0)
                 return;
 
         unhookAll ();

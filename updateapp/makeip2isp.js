@@ -103,6 +103,7 @@ function readFile (file) {
         "AS2570": 8,    /* Telecom New Zealand */
         "AS4771": 8,    /* Netgate (another part of Telecom NZ) */
         "AS9325": 8,    /* Telecom XTRA */
+        "AS17705": 9,   /* inspire.net.nz */
 
         "AS1221": 10,   /* Telstra */
         "AS4739": 11,   /* Internode */

@@ -139,6 +139,8 @@ public:
                                sockaddr_in ** replace);
         bool            match (const char * name,
                                sockaddr_in ** replace);
+        bool            match (const char * name,
+                               const char ** replace);
 };
 
 /**@}*/

@@ -45,19 +45,16 @@
 /**
  * Avoid the standard VC++ new and delete since they are throwing, so using
  * them would be insane.
- *
- * Instead just rely on the Win32 heap routines, since they're pretty much all
- * that the VC++ malloc ()/free () use these days anyway.
  */
 
 /* static */
 void * operator new (size_t size) throw () {
-        return HeapAlloc (GetProcessHeap (), 0, size);
+        return malloc (size);
 }
 
 /* static */
 void operator delete (void * mem) {
-        HeapFree (GetProcessHeap (), 0, mem);
+        free (mem);
 }
 
 /**
@@ -91,7 +88,7 @@ FreeAddrInfoWFunc       g_freeFunc;
  */
 
 FilterRule :: FilterRule () : m_pattern (0), m_hasPort (false), m_port (0),
-                m_replace (0), m_nextReplace (0), m_next (0) {
+                m_rewrite (0), m_replace (0), m_nextReplace (0), m_next (0) {
 }
 
 /**
@@ -101,6 +98,8 @@ FilterRule :: FilterRule () : m_pattern (0), m_hasPort (false), m_port (0),
 FilterRule :: ~ FilterRule () {
         freeInfo (m_replace);
 
+        if (m_rewrite != 0)
+                free (m_rewrite);
         if (m_pattern != 0)
                 free (m_pattern);
 }
@@ -174,19 +173,12 @@ wchar_t * FilterRule :: unescape (wchar_t * dest, size_t length,
         -- length;
 
         for (; from != to ;) {
-                wchar_t         temp = * from;
-                if (temp == '\\') {
-                        ++ from;
-                        if (from == to)
-                                break;
-
-                        temp = * from;
-                }
+                wchar_t         temp = * from ++;
+                if (temp == '\\' && from != to)
+                        temp = * from ++;
 
                 if (temp == 0)
                         break;
-
-                ++ from;
 
                 if (length == 0)
                         return 0;
@@ -244,6 +236,68 @@ wchar_t * FilterRule :: wcscatdup (const wchar_t * left, const wchar_t * middle,
                 wcscpy (temp + leftLen + middleLen, right);
 
         return temp;
+}
+
+/**
+ * Combine wcsdup () and unescape () with conversion to UTF-8.
+ */
+
+char * FilterRule :: urldup (const wchar_t * from, const wchar_t * to) {
+        const wchar_t * scan = from;
+        size_t          length = 1;
+        while (scan != to) {
+                wchar_t         ch = * scan ++;
+                if (ch == '\\' && scan != to)
+                        ch = * scan ++;
+                if (ch == 0)
+                        break;
+
+                /*
+                 * Choose the base or multibyte encoding for the character.
+                 */
+
+                ++ length;
+                if (ch < 0x80)
+                        continue;
+                do {
+                        ch >>= 6;
+                        ++ length;
+                } while (ch > 0);
+        }
+
+        char          * dup = (char *) malloc (length);
+        char          * dest = dup;
+        scan = from;
+        while (scan != to) {
+                wchar_t         ch = * scan ++;
+                if (ch == '\\' && scan != to)
+                        ch = * scan ++;
+                if (ch == 0)
+                        break;
+
+                if (ch < 0x80) {
+                        * dest ++ = (unsigned char) ch;
+                        continue;
+                }
+
+                /*
+                 * A little awkward since UTF-8 is big-endian. To make this a
+                 * little simpler, we're on Windows and I'm not going to try
+                 * and worry about surrogate pairs, so only 3-byte sequences
+                 * max.
+                 */
+
+                if (ch < 0x800) {
+                        * dest ++ = 0xC0 | (ch >> 6);
+                } else {
+                        * dest ++ = 0xE0 | (ch >> 12);
+                        * dest ++ = 0x80 | ((ch >> 6) & 0x3F);
+                }
+                * dest ++ = 0x80 | (ch & 0x3F);
+        }
+
+        * dest = 0;
+        return dup;
 }
 
 /**
@@ -492,6 +546,7 @@ bool FilterRule :: parseRule (const wchar_t * from, const wchar_t * to) {
          * than blocking them, which is indeed how this all got started.
          */
 
+        bool            url = * from == '/';
         const wchar_t * replace = lookahead (from, to, '=');
         const wchar_t * replaceTo = 0;
 
@@ -518,6 +573,18 @@ bool FilterRule :: parseRule (const wchar_t * from, const wchar_t * to) {
          */
 
         m_pattern = from != 0 && * from != 0 ? wcsdup (from, to) : 0;
+
+        /*
+         * If the rule is a URL, just copy it.
+         *
+         * Since we want the replacement text as UTF-8, that means a little
+         * more work.
+         */
+
+        if (url) {
+                this->m_rewrite = urldup (replace, replaceTo);
+                return true;
+        }
 
         /*
          * Now, turn the replacement specs into a sequence of addrinfo data.
@@ -573,6 +640,24 @@ bool FilterRule :: match (const char * example, addrinfo ** replace) {
         return true;
 }
 
+
+/**
+ * Match a filter rule based on a URL string.
+ */
+
+bool FilterRule :: match (const char * example, const char ** replace) {
+        if (m_pattern != 0 && ! globMatch (example, m_pattern))
+                return false;
+
+        /*
+         * OK, a match. For URLs, we just return the text to rewrite the URL
+         * with, if any (no rewrite text means to block it outright).
+         */
+
+        if (replace != 0)
+                * replace = m_rewrite;
+        return true;
+}
 
 /**
  * Lock for controlling access to the list of rules within a rule set, since
@@ -902,6 +987,33 @@ bool FilterRules :: match (const char * name, sockaddr_in ** replace) {
                 * replace = (sockaddr_in *) out->ai_addr;
         } else
                 * replace = 0;
+
+        return test != 0;
+}
+
+/**
+ * Match a URL string and return a suitable replacement.
+ */
+
+bool FilterRules :: match (const char * name, const char ** replace) {
+        if (! l_initFuncs ())
+                return false;
+
+        EnterCriticalSection (l_filterLock);
+
+        if (m_pending != 0) {
+                parse (m_pending, 0, m_head, m_tail);
+                free (m_pending);
+                m_pending = 0;
+        }
+
+        FilterRule    * test = m_head;
+        for (; test != 0 ; test = test->m_next) {
+                if (test->match (name, replace))
+                        break;
+        }
+
+        LeaveCriticalSection (l_filterLock);
 
         return test != 0;
 }

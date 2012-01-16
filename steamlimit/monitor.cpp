@@ -112,13 +112,13 @@ unsigned long   g_profileId;
  *
  * This doesn't cause an in-your-face prompt, so more often than less is not
  * likely to be harmful. The only potential drawback here would be for anyone
- * on a dial-up connection. 20 or 30 days, maybe?
+ * on a dial-up connection. Once a week seems good.
  *
- * This is based on a FILETIME, so 400ns is the basic "tick" aka 2.5 million,
+ * This is based on a FILETIME, so 100ns is the basic "tick" aka 2.5 million,
  * we'll put the number of days as the leftmost term.
  */
 
-#define UPGRADE_CHECK_DELTA     (30 * 24 * 60 * 60 * 2500000ULL)
+#define UPGRADE_CHECK_DELTA     (7 * 24 * 60 * 60 * 10000000ULL)
 
 /**
  * The standard Windows shell key for application launch at login.

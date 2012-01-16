@@ -475,10 +475,18 @@ BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
         return result;
 }
 
-bool filterHttpUrl (const char * buf, int length) {
+/**
+ * Apply URL filters.
+ */
+
+const char * filterHttpUrl (const char * buf, size_t & length) {
         if (length < 10)
-                return false;
+                return buf;
         
+        /*
+         * The Steam client uses upper-case verb text, so we keep things simple.
+         */
+
         size_t          verb = 0;
         if (memcmp (buf, "GET /", 5) == 0) {
                 verb = 4;
@@ -486,7 +494,7 @@ bool filterHttpUrl (const char * buf, int length) {
                 verb = 5;
 
         if (verb == 0)
-                return false;
+                return buf;
 
         /*
          * Measure the URL before extracting a temporary copy for the filter
@@ -494,17 +502,61 @@ bool filterHttpUrl (const char * buf, int length) {
          */
 
         const char    * end = (const char *) memchr (buf + verb, ' ', length);
-        size_t          len = end == 0 ? 0 : end - buf;
+        size_t          tempLen = end == 0 ? 0 : end - buf;
         char            temp [128];
-        if (len == 0 || len + 2 >= sizeof (temp))
-                return false;
+        if (tempLen == 0 || tempLen + 2 >= sizeof (temp))
+                return buf;
 
-        memcpy (temp, buf, len);
-        strcpy (temp + len, "\r\n");
+        memcpy (temp, buf, tempLen);
+        strcpy (temp + tempLen, "\r\n");
         OutputDebugStringA (temp);
-        temp [len] = 0;
+        temp [tempLen] = 0;
 
-        return strcmp (temp + verb, "/initsession/") == 0;
+        const char    * replace = 0;
+        if (! g_rules.match (temp + verb, & replace))
+                return buf;
+
+        /*
+         * An empty pattern means block.
+         */
+
+        if (replace == 0 || * replace == 0)
+                return 0;
+
+        /*
+         * A pattern of * or /* means pass through.
+         *
+         * To make this more robust, I'll skip over any leading '/' in the
+         * replacement text, and I'll extend the length of the "verb" part to
+         * including the '/' which has to be in the base request so that the
+         * replacement process always produces a well-formed anchored URL.
+         */
+
+        ++ verb;
+        while (replace [0] == '/')
+                ++ replace;
+
+        if (replace [0] == '*' && replace [1] == 0)
+                return buf;
+
+        /*
+         * OK, what about more exotic cases? In principle I can replace the
+         * original data block with our URL in place of the original.
+         */
+
+
+        size_t          subst = strlen (replace);
+        size_t          rest = (buf + length - end);
+        size_t          total = verb + subst + rest;
+        char          * copy = (char *) HeapAlloc (GetProcessHeap (), 0, total + 1);
+
+        memcpy (copy, buf, verb);
+        memcpy (copy + verb, replace, subst);
+        memcpy (copy + verb + subst, end, rest);
+        copy [total] = 0;
+
+        OutputDebugStringA (copy);
+        return copy;
 }
 
 /**
@@ -525,13 +577,55 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
                         unsigned long * sent, unsigned long flags,
                         OVERLAPPED * overlapped,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
-        if (filterHttpUrl (buffers [0].buf, buffers [0].len)) {
+        const char    * buf = buffers [0].buf;
+        size_t          len = buffers [0].len;
+        buf = filterHttpUrl (buf, len);
+
+        if (buf == 0) {
                 OutputDebugStringA ("Blocking HTTP request\r\n");
                 SetLastError (WSAECONNRESET);
                 return SOCKET_ERROR;
         }
 
-        return (* g_wsaSendHook) (s, buffers, count, sent, flags, overlapped, handler);
+        /*
+         * Pass-through is the simple case.
+         */
+
+        if (buf == buffers [0].buf) {
+                return (* g_wsaSendHook) (s, buffers, count, sent, flags,
+                                          overlapped, handler);
+        }
+
+        /*
+         * If the URL was rewritten, things are complex if we want to mimic the
+         * action of the underlying API faithfully to the caller - especially
+         * if the caller is using overlapped I/O and even more if completion
+         * ports are involved (they are excellent, just not for what we're in
+         * the process of doing here).
+         *
+         * If I decide to go for some form of persistent context tracking for
+         * sockets that makes all that easier, especially since we can just do
+         * a synchronous success to the caller and manage the rest in the
+         * background.
+         *
+         * However, for now since the Steam client does synchronous sends with
+         * just one buffer structure, that's all I'll support.
+         */
+
+        if (overlapped != 0 || handler != 0 || count > 1) {
+                SetLastError (WSAEINVAL);
+                return SOCKET_ERROR;
+        }
+
+        WSABUF          temp [1] = { len, (char *) buf };
+        int             result;
+        unsigned long   actual;
+        result = (* g_wsaSendHook) (s, temp, 1, & actual, flags, 0, 0);
+        if (result != 0)
+                return result;
+
+        * sent = buffers [0].len;
+        return 0;
 }
 
 /**
@@ -583,7 +677,7 @@ int setFilter (wchar_t * address) {
                  * will take precedence to this catch-all.
                  */
 
-                g_rules.append (L"content?.steampowered.com=");
+                g_rules.append (L"content?.steampowered.com=;/initsession/=");
         }
 
         return result ? 1 : 0;

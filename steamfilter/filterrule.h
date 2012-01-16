@@ -82,6 +82,7 @@ private:
         wchar_t       * m_pattern;
         bool            m_hasPort;
         unsigned short  m_port;
+        char          * m_rewrite;
         addrinfo      * m_replace;
         addrinfo      * m_nextReplace;
         FilterRule    * m_next;
@@ -93,6 +94,7 @@ static  wchar_t       * unescape (wchar_t * dest, size_t length,
 static  wchar_t       * wcsdup (const wchar_t * from, const wchar_t * to);
 static  wchar_t       * wcscatdup (const wchar_t * left, const wchar_t * middle,
                                    const wchar_t * right);
+static  char          * urldup (const wchar_t * from, const wchar_t * to);
 
         void            freeInfo (addrinfo * info);
 
@@ -106,6 +108,7 @@ public:
 static  bool            installFilters (wchar_t * str);
 
         bool            match (const char * example, addrinfo ** replace);
+        bool            match (const char * example, const char ** replace);
 
                         FilterRule ();
                       ~ FilterRule ();

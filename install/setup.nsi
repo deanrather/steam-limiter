@@ -258,6 +258,7 @@ finishInstall:
    */
 
   DeleteRegKey HKLM $SETTINGS
+  DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
 	
 	/*
 	 * Remove pre-v0.5 settings that were moved to profile options.

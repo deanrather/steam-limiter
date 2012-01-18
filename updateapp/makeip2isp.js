@@ -110,6 +110,7 @@ function readFile (file) {
         "AS4802": 12,   /* iiNet (Adelaide, SA) */
         "AS4854": 12,   /* Netspace Online Systems (Melbourne), now iiNet */
         "AS7474": 13,   /* SingTel Optus */
+        "AS4804": 13,   /* Microplex PTY LTD, owned by Singtel Optus */
         "AS9443": 14,   /* iPrimus aka Primus Telecommunications */
         "AS9543": 15,   /* Westnet Internet Services (Perth, WA) */
         "AS9556": 16,   /* Adam Internet Pty Ltd (Adelaide, SA) */

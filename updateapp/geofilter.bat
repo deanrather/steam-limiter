@@ -26,7 +26,7 @@ findstr /r "ADSData Vodafone.NZ Telecom.New Telecom.XTRA Netgate InSPire.Net" %1
 rem Targeting these Australian ISPs for now since they seem the biggest and
 rem some people from them have installed the limiter tool
 
-findstr /r "Telstra.Pty iiNet Internode Optus Primus" %1 > netblock2.csv
+findstr /r "Telstra.Pty iiNet Internode Optus Microplex Primus" %1 > netblock2.csv
 
 rem Other Australian ISPs, some connected with iiNet various ways
 

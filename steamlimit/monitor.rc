@@ -150,7 +150,7 @@ BEGIN
     CTEXT "Steam Limiter", IDC_APPNAME, 0, 2, 200, 10
     PUSHBUTTON "http://steam-limiter.googlecode.com", IDC_SITE, 0, 10, 200, 10
     PUSHBUTTON "(C) 2011 Nigel Bree|http://profiles.google.com/nigel.bree/about", IDC_AUTHOR, 0, 20, 200, 10
-    CTEXT "A new version is available!", 0, SS_CENTER, 0, 30, 200, 10
+    CTEXT "A new version is available!", 0, 0, 30, 200, 10
 
     DEFPUSHBUTTON "&Upgrade Now", IDB_UPGRADE, 25, 42, 50, 10
     PUSHBUTTON "&No Thanks", IDOK, 125, 42, 50, 10

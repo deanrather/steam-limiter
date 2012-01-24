@@ -101,6 +101,16 @@ def stringip_to_number (text):
 
     return total;
 
+# Alternate mapping table for IPv6 netblocks; currently there are few of these,
+# but Internode in Australia appear to be one such organization. For now I'm
+# not bothering to explicitly represent the prefix length, I'm just using a
+# simple prefix match.
+
+ipv6_prefixes = {
+    "2001:4400:": 0,    # TelstraClear New Zealand
+    "2001:44B8:": 11    # Internode Australia
+};
+
 # Find any matching tuple inside the ip_match.ip_table list, which is sorted,
 # and return the ISP number for it
 #
@@ -113,7 +123,18 @@ def find_netblock (ip):
         ip = '203.167.129.4'
 
     if type (ip) == str:
-        ip = stringip_to_number (ip)
+        if ':' in ip:   # look in IPv6 table.
+            ip = ip.upper ()
+            for prefix in ipv6_prefixes.items ():
+                if ip.startswith (prefix [0]):
+                    return prefix [1]
+
+            logging.warning ('Unknown mapping for IPv6 address ' + ip)
+            return - 1
+
+        ipv4 = stringip_to_number (ip)
+    else:
+        ipv4 = ip
 
     # Binary search or linear? Now the table is 1200 long, it's worth it to do
     # a binary search.
@@ -126,18 +147,20 @@ def find_netblock (ip):
         mid = (low + high) / 2
         item = table [mid]
 
-        if item [0] >= ip:
+        if item [0] >= ipv4:
             # Move down
             high = mid - 1
             continue
 
-        if item [1] >= ip:
+        if item [1] >= ipv4:
             # We have a match
             return item [2]
 
         # Move up
         low = mid + 1
 
+    if type (ip) == str:
+        logging.warning ('Unknown mapping for IPv4 address ' + ip)
     return - 1
 
 # The ISP indexes I use in the netblock table
@@ -297,7 +320,7 @@ def send (handler, data):
 
 def bundle (self):
     source = self.request.remote_addr
-    netblock = find_netblock (source);
+    netblock = find_netblock (source)
 
     # GAE actually includes a small amount of GeoIP itself; not what need for
     # ISP selection, but interesting nonetheless (note: only in production,

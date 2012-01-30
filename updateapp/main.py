@@ -243,11 +243,23 @@ isps = {
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
           'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
     11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=49.143.234.14,111.119.10.2,steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2,steam.cdn.on.net' },
+          'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,ga17.gamearena.com.au,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net' },
     12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
-    13: { 'name': 'Optus Australia', 'server': '49.143.234.6',
-          'filter': '*:27030=49.143.234.6,49.143.234.14' },
+
+    # Evidently Optus actually don't actually offer any unmetered content, so
+    # these server selections are intended more for download performance than
+    # for providing unmetered data. I've a report from an Optus customer that
+    # the Sydney and San Jose servers give much better perf than the two which
+    # where previously listed here. The 49.xx.xx.xx servers are on AS209 QWest
+    # so are in the United States, so the Sydney server should work well.
+    #
+    # The hard bit about this is that performance depends on load, and so the
+    # server selections that work well most of the time may end up being less
+    # than optimal during load spikes such as Steam sales.
+
+    13: { 'name': 'Optus Australia', 'server': '111.119.10.2',
+          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net, 49.143.234.6,49.143.234.14' },
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
           'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' },
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
@@ -271,7 +283,8 @@ isps = {
 
     # Regularly installs turn up from Google netblocks; possibly this is part
     # of sandboxed malware scanning of Google Code downloads, but equally for
-    # all I know it could be humans.
+    # all I know it could be humans, possibly in the Sydney office where they
+    # develop Google Maps.
 
     50: { 'name': 'Google, Inc', 'server': '0.0.0.0',
           'filter': '# What Steam server do Google use...?' },

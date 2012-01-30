@@ -264,7 +264,7 @@ if (hasArg ("upload")) {
  */
 
 var getData = simpleGet ("all?cb");
-var response = getData && getData.responseText || "";
+var response = (getData && getData.responseText) || "null";
 var bundle = fromJson (response);
 
 if (hasArg ("show"))
@@ -296,7 +296,8 @@ if (hasArg ("upgrade")) {
     if (! /^http:\/\/.*\.googlecode\.com\//.test (bundle.download))
         WScript.Quit (3);
 
-    var path = "package.exe";
+    var path = "%TEMP%\\package.exe";
+    path = shell.ExpandEnvironmentStrings (path);
     download (bundle.download, path);
 
     /*

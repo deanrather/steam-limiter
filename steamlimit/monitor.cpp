@@ -500,6 +500,59 @@ INT_PTR CALLBACK aboutProc (HWND window, UINT message, WPARAM wparam,
 }
 
 /**
+ * Assistant for ShowWindow () for centered dialogs to handle multiple monitors.
+ *
+ * The DS_CENTER style evidently sometimes chooses poorly based on user reports
+ * so I can either choose to force the use of the primary monitor, or the
+ * monitor currently containing the mouse cursor. Which is really a matter of
+ * preference, but I'm inclined towards forcing the primary monitor to avoid
+ * any inconsistency that might happen given that the context menu position is
+ * awkward and a mouse report can end up on a second monitor.
+ *
+ * See http://blogs.msdn.com/b/oldnewthing/archive/2007/08/09/4300545.aspx
+ */
+
+void showCentered (HWND window) {
+        /*
+         * Get the current window dimensions, since we'll preserve the width
+         * and height.
+         */
+
+        RECT            srcRect;
+        GetWindowRect (window, & srcRect);
+
+        /*
+         * The primary monitor is always at (0, 0)
+         */
+
+static  const POINT     home = { 0, 0 };
+        HMONITOR        monitor = MonitorFromPoint (home, MONITOR_DEFAULTTOPRIMARY);
+
+        MONITORINFO     info = { sizeof (info) };
+        GetMonitorInfoW (monitor, & info);
+
+        /*
+         * This centers the incoming item by width and height; here I don't
+         * assume the 0, 0 origin just in case I change the selection to not
+         * always pick the primary.
+         */
+
+        unsigned long   width = srcRect.right - srcRect.left;
+        unsigned long   height = srcRect.bottom - srcRect.top;
+
+        unsigned long   destWidth = info.rcMonitor.right - info.rcMonitor.left;
+        unsigned long   destHeight = info.rcMonitor.bottom - info.rcMonitor.top;
+
+        unsigned long   left = info.rcMonitor.left + (destWidth - width) / 2;
+        unsigned long   top = info.rcMonitor.top + (destHeight - height) / 2;
+
+        SetWindowPos (window, 0, left, top, width, height,
+                      SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        ShowWindow (window, SW_SHOW);
+}
+
+
+/**
  * Create and show the "About" window.
  */
 
@@ -548,7 +601,7 @@ void showAbout (void) {
 
         SetDlgItemTextW (g_aboutWindow, IDC_APPNAME, text);
 
-        ShowWindow (g_aboutWindow, SW_SHOW);
+        showCentered (g_aboutWindow);
 }
 
 /**
@@ -726,7 +779,7 @@ void showProfile (void) {
         g_profileWindow = CreateDialogW (self, MAKEINTRESOURCE (IDD_PROFILE), 0,
                                          profileProc);
 
-        ShowWindow (g_profileWindow, SW_SHOW);
+        showCentered (g_profileWindow);
 }
 
 /**

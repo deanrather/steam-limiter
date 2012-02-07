@@ -72,6 +72,7 @@ var fso = WScript.CreateObject ("Scripting.FileSystemObject");
 
 function readFile (file) {
     var result = [];
+    var prev = { };
     var mapping = {
         "AS4768": 0,    /* TelstraClear */
         "AS7714": 0,
@@ -206,14 +207,20 @@ function readFile (file) {
         if (values.length < 3 || values [2] === null)
             continue;
 
+        var range = { start: values [0], end: values [1], id: id };
+
         /*
-         * Javascript as in Windows Script Host doesn't handle arrays properly,
-         * and so toString () doesn't print brackets and push () ends up
-         * splicing any pushed array instead of concatenating the array element
-         * itself (i.e., nested arrays pretty much don't work full stop).
+         * If the new range and the previous can be merged, merge them.
          */
 
-        result.push ({ start: values [0], end: values [1], id: id });
+        if (prev && prev.end + 1 === range.start && prev.id === id) {
+            WScript.Echo ("Merging");
+            range.start = prev.start;
+            result.pop ();
+        }
+
+        result.push (range);
+        prev = range;
     }
 }
 
@@ -235,6 +242,10 @@ for (key in array) {
      * Originally I checked that the netblock range was aligned on a class C
      * boundary, but there's a *really* odd set of netblocks where Telstra and
      * Google interleave at the level of 2-3 hosts around 1208927796
+     *
+     * The most likely cause of this is that these IPs are ones Google lease
+     * from Telstra, which have come under their ASN later on. Possibly this is
+     * Google's Sydney office.
      */
 
     file.Write ("    (" + item.start + ", " + item.end + ", " + item.id + ")")

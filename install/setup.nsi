@@ -17,10 +17,18 @@
 !searchparse /file ..\limitver.h "#define VER_WEBSITE_STR " VER_WEBSITE
 
 /*
- * Describe the installer executable the NSIS compiler builds.
+ * Describe the installer executable the NSIS compiler builds. Typically there
+ * are two builds, one which writes the version-dependent name and one which
+ * writes a fixed name, to make it easier to use the "custom build tool"
+ * option in VS2010.
  */
 
+!ifndef DUMMY
 OutFile ${OutDir}\steamlimit-${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}.exe
+!else
+OutFile ${OutDir}\installer.exe
+!endif
+
 SetCompressor /SOLID lzma
 
 Name "Steam Content Server Limiter"
@@ -103,6 +111,14 @@ FunctionEnd
 
 Function quitProgram
   ExecWait '"$INSTDIR\steamlimit.exe" -quit'
+
+  /*
+   * Somewhat arbitrary delay, since executables on Windows can still be in-use
+   * for a short time even after the processes that were running them have
+   * called ExitProcess.
+   */
+
+  Sleep 10
 FunctionEnd
 
 Section
@@ -272,6 +288,14 @@ SectionEnd
 
 Section "Uninstall"
   ExecWait "$INSTDIR\steamlimit.exe -quit"
+
+  /*
+   * Somewhat arbitrary delay, since executables on Windows can still be in-use
+   * for a short time even after the processes that were running them have
+   * called ExitProcess.
+   */
+
+  Sleep 10
 
   Delete $INSTDIR\uninst.exe
   Delete $INSTDIR\steamlimit.exe

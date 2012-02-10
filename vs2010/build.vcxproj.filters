@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\install\setup.nsi">
-      <Filter>Source Files</Filter>
-    </None>
     <None Include="..\updateapp\makeip2isp.js">
       <Filter>Source Files</Filter>
     </None>
@@ -31,9 +28,6 @@
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\updateapp\main.py">
-      <Filter>Source Files</Filter>
-    </None>
-    <None Include="..\scripts\setfilter.js">
       <Filter>Source Files</Filter>
     </None>
     <None Include="..\updateapp\geofilter.bat">
@@ -59,5 +53,13 @@
     <ClInclude Include="..\limitver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\install\setup.nsi">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\scripts\setfilter.js">
+      <Filter>Source Files</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

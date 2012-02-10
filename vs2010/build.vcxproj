@@ -11,8 +11,22 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\install\setup.nsi" />
-    <None Include="..\scripts\setfilter.js" />
+    <CustomBuild Include="..\install\setup.nsi">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi
+"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) /dDUMMY=1 ../install/setup.nsi</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\scripts\setfilter.js $(OutDir)\steamlimit.exe $(OutDir)\steamfilter.dll</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\scripts\setfilter.js $(OutDir)\steamlimit.exe $(OutDir)\steamfilter.dll</AdditionalInputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi
+"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) /dDUMMY=1 ../install/setup.nsi</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\installer.exe</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\installer.exe</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\scripts\setfilter.js">
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+      </Command>
+    </CustomBuild>
     <None Include="..\updateapp\app.yaml" />
     <None Include="..\updateapp\base.css" />
     <None Include="..\updateapp\default_error.html" />
@@ -68,7 +82,8 @@
       <ModuleDefinitionFile>..\steamfilter\filter.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -82,7 +97,8 @@
       <ModuleDefinitionFile>..\steamfilter\filter.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
-      <Command>"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -453,7 +453,7 @@ def notifyOwner (text, kind):
 # Feedback model for the feedback submission form to persist
 
 class Feedback (db.Model):
-    content = db.StringProperty (multiline = True)
+    content = db.TextProperty ()
     source = db.StringProperty ()
     timestamp = db.DateTimeProperty (auto_now = True)
 

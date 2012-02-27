@@ -260,8 +260,13 @@ isps = {
 
     13: { 'name': 'Optus Australia', 'server': '111.119.10.2',
           'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net, 49.143.234.6,49.143.234.14' },
+
+    # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
+    # where iPrimus list their unmetered servers, and suggests this rule:
+
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=steam1.syd7.internode.on.net,steam.mel.ipgn.com.au,steam.waia.asn.au' },
+          'filter': '*:27030=49.143.234.14,111.119.10.2,steam1.syd7.internode.on.net,steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;content?.steampowered.com=49.143.234.14,111.119.10.2' },
+
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',

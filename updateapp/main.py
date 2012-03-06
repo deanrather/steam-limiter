@@ -271,6 +271,8 @@ isps = {
           'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,steam1.syd7.internode.on.net' },
+    17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
+          'filter': '# No known unmetered Steam server' },
 
     # Slots 17-29 are reserved for future Australian ISPs or tertiary institutions.
 
@@ -278,8 +280,10 @@ isps = {
           'filter': '*:27030=steam.isgaming.co.za' },
     31: { 'name': 'webafrica (Cape Town, South Africa)', 'server': '41.185.24.21',
           'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za' },
+    32: { 'name': 'Telkom SAIX, South Africa', 'server': '0.0.0.0',
+         'filter': '# No known unmetered Steam server' },
 
-    # Slots 32-39 are reserved for future South African ISPs
+    # Slots 33-39 are reserved for future South African ISPs
 
     # No reverse DNS for this one but it's definitely in the vodafone.is netblock
 

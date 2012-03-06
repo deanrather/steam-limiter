@@ -115,9 +115,17 @@ function readFile (file) {
         "AS9443": 14,   /* iPrimus aka Primus Telecommunications */
         "AS9543": 15,   /* Westnet Internet Services (Perth, WA) */
         "AS9556": 16,   /* Adam Internet Pty Ltd (Adelaide, SA) */
+        "AS18404": 17,  /* EAccess */
+
+        /*
+         * Another possible SA ISP is OpenWeb, but they don't seem to have
+         * their own ASN, their website is hosted on MTN Business and I've had
+         * an indication that their retail DSL detects as from the IS netblock.
+         */
 
         "AS3741": 30,   /* Internet Solutions (Johannesburg, South Africa) */
         "AS36943": 31,  /* webafrica (Cape Town, South Africa) */
+        "AS5713": 32,   /* Telkom SAIX */
 
         "AS12969": 40,  /* Vodafone Iceland */
 
@@ -138,6 +146,7 @@ function readFile (file) {
          * to handle Comcast.
          */
 
+        "AS7922": 60,   /* actually seen this one used */
         "AS21508": 60,  /* actually seen this one used */
         "AS33490": 60   /* actually seen this one used */
 
@@ -145,7 +154,6 @@ function readFile (file) {
         "AS7015": 60,
         "AS7016": 60,
         "AS7725": 60,
-        "AS7922": 60,
         "AS13367": 60,
         "AS20214": 60,
         "AS22258": 60,

@@ -11,27 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\steamlimit\hyperlink.cpp" />
-    <ClCompile Include="..\steamlimit\inject.cpp" />
-    <ClCompile Include="..\steamlimit\monitor.cpp" />
-    <ClCompile Include="..\steamlimit\profile.cpp" />
+    <ClCompile Include="..\probe\probe.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="..\steamlimit\monitor.rc" />
+    <ResourceCompile Include="..\probe\probe.rc" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\steamlimit\hyperlink.h" />
-    <ClInclude Include="..\steamlimit\inject.h" />
-    <ClInclude Include="..\steamlimit\profile.h" />
-    <ClInclude Include="..\steamlimit\resource.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\steamlimit\monitor.ico" />
+    <ClInclude Include="..\probe\resource.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{8AA82AF8-EBFD-408E-A7FF-224C0A6E9193}</ProjectGuid>
-    <Keyword>Win32Proj</Keyword>
-    <RootNamespace>steamlimit</RootNamespace>
+    <ProjectGuid>{AF1E693F-F5AE-406E-89BF-9E2440152F25}</ProjectGuid>
+    <RootNamespace>steamfilter</RootNamespace>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -57,32 +47,44 @@
     <Import Project="common.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <LinkIncremental>true</LinkIncremental>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <LinkIncremental>false</LinkIncremental>
+    <GenerateManifest>false</GenerateManifest>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <GenerateManifest>false</GenerateManifest>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OmitDefaultLibName>
+      </OmitDefaultLibName>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>myWinMain</EntryPointSymbol>
+      <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <OmitDefaultLibName>
+      </OmitDefaultLibName>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
+      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <EntryPointSymbol>myWinMain</EntryPointSymbol>
+      <SubSystem>Console</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

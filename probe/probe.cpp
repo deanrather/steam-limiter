@@ -121,6 +121,32 @@ int checkNntp (SOCKET s) {
 }
 
 /**
+ * If we're asked to probe for an HTTP port, then we need to avoid problems
+ * with local proxies.
+ *
+ * Unlike NNTP, the HTTP protocol is client-driven; as it turns out the way the
+ * crappy Avast! proxy works is that it'll unilaterally close the connection if
+ * it can't reach the real intended target, but in order to have this work for
+ * real targets it pays to request a resource. The safest thing to ask for seems
+ * to be favicon.ico - it's something lots of browsers request anyway and it's
+ * almost always a small image, so we shouldn't clog up logs with requests for
+ * 404 resources or get elaborate 404 response pages back.
+ */
+
+int checkHttp (SOCKET s) {
+static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
+        int             result;
+        int             length = strlen (head);
+        result = send (s, head, length, 0);
+        if (result < length)
+                return 1;
+
+        char            buf [1024];
+        result = recv (s, buf, sizeof (buf), 0);
+        return result < 5 ? 1 : 0;
+}
+
+/**
  * Probe for the indicated port at the given host.
  */
 
@@ -187,6 +213,10 @@ int probe (wchar_t * host, wchar_t * port) {
                 break;
 
         case 80:
+                if (avast && result == 0)
+                        result = checkHttp (s);
+                break;
+
         default:
                 break;
         }
@@ -195,7 +225,7 @@ int probe (wchar_t * host, wchar_t * port) {
 }
 
 /**
- * This is intended as a "naked" WinMain without the return Visual C++ run-time
+ * This is intended as a "naked" WinMain without the Visual C++ run-time
  * at all (not just avoiding the broken locale machinery).
  */
 

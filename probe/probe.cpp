@@ -133,7 +133,7 @@ int checkNntp (SOCKET s) {
  * 404 resources or get elaborate 404 response pages back.
  */
 
-int checkHttp (SOCKET s) {
+int checkHttp (SOCKET s, HANDLE show) {
 static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
         int             result;
         int             length = strlen (head);
@@ -143,6 +143,17 @@ static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
 
         char            buf [1024];
         result = recv (s, buf, sizeof (buf), 0);
+
+        /*
+         * Show the HTTP response, for debugging.
+         */
+
+        if (result > 0 && show > 0) {
+                HANDLE          err = GetStdHandle (STD_ERROR_HANDLE);
+                unsigned long   written = 0;
+                WriteFile (err, buf, result, & written, 0);
+        }
+
         return result < 5 ? 1 : 0;
 }
 
@@ -150,8 +161,7 @@ static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
  * Probe for the indicated port at the given host.
  */
 
-int probe (wchar_t * host, wchar_t * port) {
-
+int probe (wchar_t * host, wchar_t * port, HANDLE show) {
         /*
          * Detect the presence of the Avast! virus scanner; it includes a set
          * of proxy-type firewalls that are somewhat tedious to deal with, and
@@ -214,7 +224,7 @@ int probe (wchar_t * host, wchar_t * port) {
 
         case 80:
                 if (avast && result == 0)
-                        result = checkHttp (s);
+                        result = checkHttp (s, show);
                 break;
 
         default:
@@ -247,7 +257,7 @@ int CALLBACK myWinMain (void) {
         if (port == 0)
                 return 2;
 
-        int             result = probe (name, port);
+        int             result = probe (name, port, err);
 
         if (extra == 0)
                 ExitProcess (result);

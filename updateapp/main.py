@@ -308,8 +308,8 @@ isps = {
               }
           }
         },
-    33: { 'name': 'MWeb, South Africa', 'server': '0.0.0.0',
-          'filter': '# No known unmetered Steam server',
+    33: { 'name': 'MWeb, South Africa', 'server': '196.28.69.201',
+          'filter': '*:27030=196.28.69.201,196.28.169.201',
           'test': {
               'news.wa.co.za 119': {
                   0: {

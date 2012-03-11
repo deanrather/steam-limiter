@@ -131,6 +131,11 @@ int checkNntp (SOCKET s) {
  * to be favicon.ico - it's something lots of browsers request anyway and it's
  * almost always a small image, so we shouldn't clog up logs with requests for
  * 404 resources or get elaborate 404 response pages back.
+ *
+ * It turns out that the Avast! proxy has some other exciting misbehaviours; it
+ * will sometimes (but not always) when a connection fails return an "HTTP/1.1
+ * 200 OK" status with some fixed bogus fields, one of which is a "Refresh: 1;"
+ * to re-fetch the target URL.
  */
 
 int checkHttp (SOCKET s, HANDLE show) {
@@ -142,16 +147,31 @@ static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
                 return 1;
 
         char            buf [1024];
-        result = recv (s, buf, sizeof (buf), 0);
+        result = recv (s, buf, sizeof (buf) - 1, 0);
 
+#if     1
         /*
-         * Show the HTTP response, for debugging.
+         * Show the HTTP response, for debugging. I'll keep this in as long as
+         * it doesn't cost me any compile-time space.
          */
 
         if (result > 0 && show > 0) {
                 HANDLE          err = GetStdHandle (STD_ERROR_HANDLE);
                 unsigned long   written = 0;
                 WriteFile (err, buf, result, & written, 0);
+        }
+#endif
+
+        /*
+         * Normally we wouldn't care what the actual response text was, but to
+         * deal with the fake response sometimes returned from Avast! I have to
+         * recognize and suppress it.
+         */
+
+        if (result > 0) {
+                buf [result] = 0;
+                if (strstr (buf, "\nRefresh: 1;") != 0)
+                        return 1;
         }
 
         return result < 5 ? 1 : 0;

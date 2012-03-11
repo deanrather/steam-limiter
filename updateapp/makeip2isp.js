@@ -121,11 +121,14 @@ function readFile (file) {
          * Another possible SA ISP is OpenWeb, but they don't seem to have
          * their own ASN, their website is hosted on MTN Business and I've had
          * an indication that their retail DSL detects as from the IS netblock.
+         * Axxess are another such "virtual" ISP that is a pure reseller.
          */
 
         "AS3741": 30,   /* Internet Solutions (Johannesburg, South Africa) */
         "AS36943": 31,  /* webafrica (Cape Town, South Africa) */
         "AS5713": 32,   /* Telkom SAIX */
+        "AS10474": 33,  /* MWeb */
+        "AS12258": 33,
 
         "AS12969": 40,  /* Vodafone Iceland */
 

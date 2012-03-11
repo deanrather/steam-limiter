@@ -57,6 +57,7 @@ import jinja2
 import os
 import logging
 import webapp2
+import json
 
 from google.appengine.ext.webapp import template
 from google.appengine.ext import db
@@ -251,7 +252,7 @@ isps = {
     # these server selections are intended more for download performance than
     # for providing unmetered data. I've a report from an Optus customer that
     # the Sydney and San Jose servers give much better perf than the two which
-    # where previously listed here. The 49.xx.xx.xx servers are on AS209 QWest
+    # were previously listed here. The 49.xx.xx.xx servers are on AS209 QWest
     # so are in the United States, so the Sydney server should work well.
     #
     # The hard bit about this is that performance depends on load, and so the
@@ -259,7 +260,7 @@ isps = {
     # than optimal during load spikes such as Steam sales.
 
     13: { 'name': 'Optus Australia', 'server': '111.119.10.2',
-          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net, 49.143.234.6,49.143.234.14' },
+          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14' },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
     # where iPrimus list their unmetered servers, and suggests this rule:
@@ -274,14 +275,50 @@ isps = {
     17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server' },
 
-    # Slots 17-29 are reserved for future Australian ISPs or tertiary institutions.
+    # Slots 18-29 are reserved for future Australian ISPs or tertiary institutions.
+
+    # Because it seems customers with dual ISP accounts is common in South
+    # Africa (along with a large fraction of the retail ISPs being pure
+    # resellers), detection in ZA needs extra work from the client side to
+    # be sure of what connectivity is present, so there are rule extensions
+    # to detect dual-ISP situations and prefer the WebAfrica unmetered server
+    # if there's connectivity to the WebAfrica customer side.
 
     30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
-          'filter': '*:27030=steam.isgaming.co.za' },
+          'filter': '*:27030=steam.isgaming.co.za',
+          'test': {
+              'news.wa.co.za 119': {
+                  0: {
+                      'ispname': 'WebAfrica/IS dual ISP',
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                  }
+              }
+          }
+        },
     31: { 'name': 'webafrica (Cape Town, South Africa)', 'server': '41.185.24.21',
           'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za' },
     32: { 'name': 'Telkom SAIX, South Africa', 'server': '0.0.0.0',
-         'filter': '# No known unmetered Steam server' },
+          'filter': '# No known unmetered Steam server',
+          'test': {
+              'news.wa.co.za 119': {
+                  0: {
+                      'ispname': 'WebAfrica/SAIX dual ISP',
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                  }
+              }
+          }
+        },
+    33: { 'name': 'MWeb, South Africa', 'server': '0.0.0.0',
+          'filter': '# No known unmetered Steam server',
+          'test': {
+              'news.wa.co.za 119': {
+                  0: {
+                      'ispname': 'WebAfrica/MWeb dual ISP',
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                  }
+              }
+          }
+        },
 
     # Slots 33-39 are reserved for future South African ISPs
 
@@ -320,8 +357,6 @@ class MainHandler (webapp2.RequestHandler):
 # Since we're sending back data rather than plain text, abstract out the
 # wrapping of the data, permitting the caller to ask for JSONP style.
 
-import json
-
 def send (handler, data):
     cb = handler.request.get ('cb', '()')
     if cb == '()':
@@ -355,8 +390,7 @@ def bundle (self):
     logging.info (source + '(country=' + country + ') mapped to ' + '%d' % netblock)
 
     isp = isps.get (netblock);
-
-    return {
+    result = {
         'latest': latest_version,
         'download': code_file_base + latest_file,
         'country': country,
@@ -364,6 +398,12 @@ def bundle (self):
         'filterip': isp ['server'],
         'filterrule': isp.get ('filter') or isp ['server']
     }
+
+    test = isp.get ('test')
+    if test:
+        result ['test'] = test
+
+    return result
 
 # The query page for the latest revision, which can information about the latest
 # version number in various forms
@@ -392,7 +432,6 @@ class DownloadHandler (webapp2.RequestHandler):
             self.redirect (to)
         else:
             send (self, to)
-
 
 # A query page for exercising the IP->ISP mapping; the bit below for loopback
 # is for local testing since that doesn't yield a valid IP for the matching
@@ -522,6 +561,24 @@ class UploadRuleHandler (webapp2.RequestHandler):
 
         expand (self, 'thanks.html', { })
 
+# Handle a posted report from a special local test - this is primarily used
+# in beta builds to see how some of the client-end rule extensions are being
+# processed.
+
+class TestReportHandler (webapp2.RequestHandler):
+    def get (self):
+        expand (self, 'uploadrule.html', { })
+
+    def post (self):
+        test = self.request.get ('test')
+        result = self.request.get ('result')
+
+        country = self.request.headers.get ('X-AppEngine-Country')
+        country = country or 'Unknown'
+
+        notifyOwner (test + ' ==> ' + result + '\n', 'test')
+        expand (self, 'thanks.html', { })
+
 # Custom 404 that suggests filing an issue rather than the default blank.
 
 class NotFoundHandler (webapp2.RequestHandler):
@@ -540,6 +597,7 @@ app = webapp2.WSGIApplication ([('/', MainHandler),
                                 ('/all', BundleHandler),
                                 ('/feedback', FeedbackHandler),
                                 ('/uploadrule', UploadRuleHandler),
+                                ('/testreport', TestReportHandler),
                                 ('/.*', NotFoundHandler)],
                                debug = True)
 

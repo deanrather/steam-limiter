@@ -52,13 +52,13 @@ wchar_t * split (wchar_t * args) {
 
         if (* args == '"') {
                 for (;;) {
+                        ++ args;
                         wchar_t         ch = * args;
                         if (ch == '"')
                                 break;
 
                         if (ch == 0)
                                 return 0;
-                        ++ args;
                 }
         }
 

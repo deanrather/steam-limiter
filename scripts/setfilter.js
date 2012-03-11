@@ -60,6 +60,8 @@ var xhr = WScript.CreateObject ("MSXML2.XmlHttp");
 var shell = WScript.CreateObject ("WScript.Shell");
 var base = "http://steam-limiter.appspot.com/";
 var regPath = "HKCU\\Software\\SteamLimiter\\"
+var scriptDir = WScript.ScriptFullName;
+scriptDir = scriptDir.substring (0, scriptDir.lastIndexOf ('\\') + 1);
 
 /**
  * Include the requesting app version and WScript version in the user-agent
@@ -326,6 +328,74 @@ if (hasArg ("upgrade")) {
  */
 
 shell.RegWrite (regPath + "NextVersion", bundle.latest);
+
+/*
+ * Look for an indication from the webservice that it needs us to run local
+ * tests to definitively select the filter rules.
+ *
+ * There are a couple of potential reasons for this; one is in South Africa,
+ * the ISP market dynamics are uniquely broken and it's reasonably common for
+ * people to have multiple ISPs. Hence, for most known SA ISPs there needs to
+ * be a backup test to select the right filter rules (and even then, it's not
+ * going to be foolproof on my side, because it can't be in the face of this
+ * kind of adverse environment).
+ *
+ * The other is the HTTP support in Steam's new download system, where many of
+ * the ISPs hosting Steam content servers are keeping port 80 firewalled (my
+ * own ISP TelstraClear does this). Since most ISPs do not correctly document
+ * their configuration and most of their customers aren't positioned to be
+ * able to tell me whether (or when, as time goes on) their provider enables
+ * this, one of the few things I could potentially do is request that this be
+ * probed.
+ */
+
+function probeTests (bundle) {
+    var test;
+    var result;
+    var probe = '"' + scriptDir + 'probe"';
+
+    for (test in bundle.test) {
+        var choices = bundle.test [test];
+        var result;
+        try {
+            result = shell.run (probe + test, 0, true);
+        } catch (e) {
+            return;
+        }
+
+        /*
+         * As this is a beta build and I want to see how the per-ISP tests work,
+         * send the raw result data to the webservice for logging. It would be
+         * nice to be able to keep something like this for full builds as well,
+         * to periodically check New Zealand ISPs for whether they have finally
+         * got around to opening port 80 on their Steam servers.
+         */
+
+        /* if (choices.report) */
+        simplePost ("testreport?test=" + escape (test) +
+                    "&result=" + escape (result));
+
+        /*
+         * Now, if the return result of the probe matches one of the selections
+         * associated with the test, merge the keys and values into the main
+         * bundle and return.
+         */
+
+        var merge = choices [result];
+        if (! merge)
+            continue;
+
+        var item;
+        for (item in merge)
+            bundle [item] = merge [item];
+
+        return;
+    }
+}
+
+if (bundle.test) {
+    probeTests (bundle);
+}
 
 /*
  * What happens next depends on whether we're being run by the installer, to

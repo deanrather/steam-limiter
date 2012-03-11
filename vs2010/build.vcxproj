@@ -15,15 +15,16 @@
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi
 "c:\program files\nsis\makensis"  /dOutDir=$(OutDir) /dDUMMY=1 ../install/setup.nsi</Command>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\scripts\setfilter.js $(OutDir)\steamlimit.exe $(OutDir)\steamfilter.dll</AdditionalInputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\scripts\setfilter.js $(OutDir)\steamlimit.exe $(OutDir)\steamfilter.dll</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">..\scripts\setfilter.js;$(OutDir)\steamlimit.exe;$(OutDir)\steamfilter.dll;$(OutDir)\probe.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">..\scripts\setfilter.js;$(OutDir)\steamlimit.exe;$(OutDir)\steamfilter.dll;$(OutDir)\probe.exe</AdditionalInputs>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi
 "c:\program files\nsis\makensis"  /dOutDir=$(OutDir) /dDUMMY=1 ../install/setup.nsi</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(OutDir)\installer.exe</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(OutDir)\installer.exe</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\scripts\setfilter.js">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">"c:\program files\nsis\makensis"  /dOutDir=$(OutDir) ../install/setup.nsi</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+      </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
       </Command>
     </CustomBuild>
@@ -94,7 +95,6 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <ModuleDefinitionFile>..\steamfilter\filter.def</ModuleDefinitionFile>
     </Link>
     <PostBuildEvent>
       <Command>

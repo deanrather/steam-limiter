@@ -158,6 +158,7 @@ upgrade:
   SetOutPath $INSTDIR
   WriteUninstaller $INSTDIR\uninst.exe
 
+  FILE ${OutDir}\probe.exe
   File ${OutDir}\steamlimit.exe
   File ${OutDir}\steamfilter.dll
   File ..\scripts\setfilter.js

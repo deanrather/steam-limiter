@@ -319,10 +319,25 @@ isps = {
               }
           }
         },
+    34: { 'name': 'Cybersmart, South Africa', 'server': '0.0.0.0',
+          'filter': '# No known Steam server for Cybersmart',
+          'test': {
+              'news.wa.co.za 119': {
+                  0: {
+                      'ispname': 'WebAfrica/Cybersmart dual ISP',
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                  }
+              }
+          }
+        },
 
-    # Slots 33-39 are reserved for future South African ISPs
 
-    # No reverse DNS for this one but it's definitely in the vodafone.is netblock
+    # Slots 35-39 are reserved for future South African ISPs
+
+    # Iceland is tricky; like a lot of countries, there's a former state
+    # monopoly which has a lot of DSL users, but they don't run a Steam server,
+    # but only Vodafone do now and it's filtered so I can't easily find out
+    # whether it has HTTP support.    
 
     40: { 'name': 'Vodafone Iceland', 'server': '193.4.194.101',
           'filter': '*:27030=193.4.194.101' },
@@ -334,6 +349,9 @@ isps = {
 
     50: { 'name': 'Google, Inc', 'server': '0.0.0.0',
           'filter': '# What Steam server do Google use...?' },
+
+    # I really have no idea what's going on with installs from Comcast netblocks
+    # so I'd hope one day someone using one bothers to explain it to me.
 
     60: { 'name': 'Comcast Communications', 'server': '0.0.0.0',
           'filter': '# No known Steam server for Comcast' }

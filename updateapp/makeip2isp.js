@@ -129,6 +129,7 @@ function readFile (file) {
         "AS5713": 32,   /* Telkom SAIX */
         "AS10474": 33,  /* MWeb */
         "AS12258": 33,
+        "AS36874": 34,  /* CyberSmart */
 
         "AS12969": 40,  /* Vodafone Iceland */
 

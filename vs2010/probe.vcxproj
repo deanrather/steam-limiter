@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\probe\probe.cpp" />
+    <ClCompile Include="..\steamfilter\glob.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\probe\probe.rc" />
@@ -64,7 +65,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ModuleDefinitionFile>
       </ModuleDefinitionFile>
-      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>myWinMain</EntryPointSymbol>
       <SubSystem>Console</SubSystem>
     </Link>
@@ -82,7 +83,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>
       </ModuleDefinitionFile>
-      <AdditionalDependencies>ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EntryPointSymbol>myWinMain</EntryPointSymbol>
       <SubSystem>Console</SubSystem>
     </Link>

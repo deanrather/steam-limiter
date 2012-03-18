@@ -18,6 +18,9 @@
     <ClCompile Include="..\probe\probe.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\steamfilter\glob.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\probe\probe.rc">

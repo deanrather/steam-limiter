@@ -287,7 +287,7 @@ isps = {
     30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
           'filter': '*:27030=steam.isgaming.co.za',
           'test': {
-              'news.wa.co.za 119': {
+              'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/IS dual ISP',
                       'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
@@ -300,7 +300,7 @@ isps = {
     32: { 'name': 'Telkom SAIX, South Africa', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server',
           'test': {
-              'news.wa.co.za 119': {
+              'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/SAIX dual ISP',
                       'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
@@ -311,7 +311,7 @@ isps = {
     33: { 'name': 'MWeb, South Africa', 'server': '196.28.69.201',
           'filter': '*:27030=196.28.69.201,196.28.169.201',
           'test': {
-              'news.wa.co.za 119': {
+              'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/MWeb dual ISP',
                       'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
@@ -322,7 +322,7 @@ isps = {
     34: { 'name': 'Cybersmart, South Africa', 'server': '0.0.0.0',
           'filter': '# No known Steam server for Cybersmart',
           'test': {
-              'news.wa.co.za 119': {
+              'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/Cybersmart dual ISP',
                       'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'

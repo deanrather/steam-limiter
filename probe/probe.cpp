@@ -36,6 +36,12 @@
 #include <ws2tcpip.h>
 
 /**
+ * Cliche for returning array lengths.
+ */
+
+#define ARRAY_LENGTH(a) (sizeof (a) / sizeof ((a) [0]))
+
+/**
  * Simple command-line argument extraction, about as unsophisticated as it can
  * possibly get.
  */
@@ -198,10 +204,6 @@ int probe (wchar_t * host, wchar_t * port, HANDLE show) {
 
         HMODULE         avast = GetModuleHandle (L"snxhk.dll");
 
-        WSADATA         wsaData;
-        if (WSAStartup (MAKEWORD (2, 2), & wsaData) != 0)
-                return 2;
-
         SOCKET          s;
         s = socket (AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (s == SOCKET_ERROR)
@@ -222,6 +224,17 @@ int probe (wchar_t * host, wchar_t * port, HANDLE show) {
         ADDRINFOW     * address;
         if (GetAddrInfoW (host, port, 0, & address) != 0)
                 return 2;
+
+        /*
+         * Ensure that we only connect via IPv4, having made an IPv4 socket
+         * already (yes, I could do things in a different order, but for my
+         * purposes here with Steam I care about IPv4 only for now since they
+         * are IPv4-only).
+         */
+
+        while (address->ai_addr->sa_family != AF_INET)
+                if ((address = address->ai_next) == 0)
+                        return 2;
 
         /*
          * Just test whether the port is open or not.
@@ -254,6 +267,106 @@ int probe (wchar_t * host, wchar_t * port, HANDLE show) {
         return result;
 }
 
+#include <iphlpapi.h>
+#include <icmpapi.h>
+#include "../steamfilter/glob.h"
+
+/*
+ * As an alternative to probing for a host, do a traceroute and permit glob
+ * matches against the hostnames.
+ *
+ * In principle one could just script a traceroute, but that's a bit slow and
+ * rather than writing a regex against the output it seems better to have a
+ * more direct match available.
+ */
+
+int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
+        HANDLE          icmp = IcmpCreateFile ();
+        if (icmp == INVALID_HANDLE_VALUE)
+                return 2;
+
+        /*
+         * Resolve an IPv4 hostname.
+         */
+
+        ADDRINFOW     * address;
+        if (GetAddrInfoW (host, 0, 0, & address) != 0)
+                return 2;
+
+        /*
+         * Ensure that we only connect via IPv4, having made an IPv4 socket
+         * already (yes, I could do things in a different order, but for my
+         * purposes here with Steam I care about IPv4 only for now since they
+         * are IPv4-only).
+         */
+
+        while (address->ai_addr->sa_family != AF_INET)
+                if ((address = address->ai_next) == 0)
+                        return 2;
+
+        sockaddr_in   * addr = (sockaddr_in *) address->ai_addr;
+        IPAddr          dest = addr->sin_addr.s_addr;
+
+        /*
+         * The timeouts in this loop are tighter than they are in general kinds
+         * of traceroute applications since we are generally probing for things
+         * near to the origin system and with latencies in the <50ms bracket.
+         */
+
+        unsigned short  ttl = 1;
+        for (; ttl < 5 ; ++ ttl) {
+                unsigned char   buf [128];
+
+                /*
+                 * Part the first; send an echo request.
+                 */
+
+                IP_OPTION_INFORMATION info = { ttl };
+
+                DWORD           echo;
+                echo = IcmpSendEcho (icmp, dest, 0, 0, & info, buf, sizeof (buf), 50);
+                if (echo < 1)
+                        continue;
+
+                /*
+                 * We expect to see IP_TTL_EXPIRED_TRANSIT since we set the TTL
+                 * to find the intermediate systems.
+                 */
+
+                ICMP_ECHO_REPLY * reply = (ICMP_ECHO_REPLY *) buf;
+                if (reply->Status != IP_TTL_EXPIRED_TRANSIT && reply->Status != 0)
+                        return 1;
+
+                /* 
+                 * Part the second; protocol-independent reverse name lookup.
+                 */
+
+                sockaddr_in     find = { AF_INET };
+                find.sin_addr.s_addr = reply->Address;
+                find.sin_port = 0;
+
+                char            name [128];
+                char            port [20];
+                unsigned long   error;
+                error = getnameinfo ((SOCKADDR *) & find, sizeof (find),
+                                     name, ARRAY_LENGTH (name),
+                                     0, 0, NI_NAMEREQD);
+
+                if (error != 0)
+                        continue;
+
+                /*
+                 * We have a name, now we can glob-match it. If we see the
+                 * desired pattern, we win. If we don't, we bail; the first
+                 * name we resolve wins.
+                 */
+
+                return globMatch (name, pattern) ? 0 : 1;
+        }
+
+        return 1;
+}
+
 /**
  * This is intended as a "naked" WinMain without the Visual C++ run-time
  * at all (not just avoiding the broken locale machinery).
@@ -276,8 +389,17 @@ int CALLBACK myWinMain (void) {
         wchar_t       * extra = split (port);
         if (port == 0)
                 return 2;
+        WSADATA         wsaData;
+        if (WSAStartup (MAKEWORD (2, 2), & wsaData) != 0)
+                return 2;
 
-        int             result = probe (name, port, err);
+
+        int             result;
+        if (wcscmp (port, L"icmp") == 0) {
+                result = trace (name, extra, err);
+        } else {
+                result = probe (name, port, err);
+        }
 
         if (extra == 0)
                 ExitProcess (result);

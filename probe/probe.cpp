@@ -56,7 +56,9 @@ wchar_t * split (wchar_t * args) {
          * the path), in which case we skip to the ending quote first.
          */
 
+        wchar_t       * quoted = 0;
         if (* args == '"') {
+                quoted = args;
                 for (;;) {
                         ++ args;
                         wchar_t         ch = * args;
@@ -84,6 +86,25 @@ wchar_t * split (wchar_t * args) {
 
         * args = 0;
         ++ args;
+
+        /*
+         * If the arguments start with quotes, strip the quotes (this isn't a
+         * completely generic thing to do, but it fits our purposes).
+         */
+
+        if (quoted) {
+                wchar_t       * from = quoted;
+                wchar_t         ch;
+                while ((ch = * ++ quoted) != '"')
+                        * from ++ = ch;
+
+                while (ch != 0) {
+                        ch = * ++ quoted;
+                        * from ++ = ch;
+                }
+
+                * from = ch;
+        }
 
         /*
          * If there are additional spaces, consume them.
@@ -155,18 +176,17 @@ static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
         char            buf [1024];
         result = recv (s, buf, sizeof (buf) - 1, 0);
 
-#if     1
         /*
          * Show the HTTP response, for debugging. I'll keep this in as long as
-         * it doesn't cost me any compile-time space.
+         * it doesn't cost me any compile-time space. I started out aiming to
+         * keep this around 4kb, and now that the traceroute code is in the
+         * aim is to keep it below 8kb.
          */
 
         if (result > 0 && show > 0) {
-                HANDLE          err = GetStdHandle (STD_ERROR_HANDLE);
                 unsigned long   written = 0;
-                WriteFile (err, buf, result, & written, 0);
+                WriteFile (show, buf, result, & written, 0);
         }
-#endif
 
         /*
          * Normally we wouldn't care what the actual response text was, but to
@@ -311,10 +331,16 @@ int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
          * The timeouts in this loop are tighter than they are in general kinds
          * of traceroute applications since we are generally probing for things
          * near to the origin system and with latencies in the <50ms bracket.
+         *
+         * We'll also only use a relatively short TTL for the echo requests as
+         * we're matching the first host with a DNS name. Also, some ISPs block
+         * ICMP echo on their Steam servers (e.g. TelstraClear, who also keep
+         * port 80 firewalled) so there's no point searching too hard since the
+         * route will stall after only 2 or so hops.
          */
 
         unsigned short  ttl = 1;
-        for (; ttl < 5 ; ++ ttl) {
+        for (; ttl < 8 ; ++ ttl) {
                 unsigned char   buf [128];
 
                 /*
@@ -324,9 +350,18 @@ int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
                 IP_OPTION_INFORMATION info = { ttl };
 
                 DWORD           echo;
-                echo = IcmpSendEcho (icmp, dest, 0, 0, & info, buf, sizeof (buf), 50);
-                if (echo < 1)
-                        continue;
+                echo = IcmpSendEcho (icmp, dest, 0, 0, & info, buf,
+                                     sizeof (buf), 50);
+                if (echo < 1) {
+                        /*
+                         * Allow one retry, "just in case".
+                         */
+
+                        echo = IcmpSendEcho (icmp, dest, 0, 0, & info, buf,
+                                             sizeof (buf), 50);
+                        if (echo < 1)
+                                continue;
+                }
 
                 /*
                  * We expect to see IP_TTL_EXPIRED_TRANSIT since we set the TTL
@@ -353,6 +388,29 @@ int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
                                      0, 0, NI_NAMEREQD);
 
                 if (error != 0)
+                        continue;
+
+                /*
+                 * If we're given a handle to write to, print the name we found.
+                 */
+
+                unsigned long   written = 0;
+                WriteFile (err, name, strlen (name), & written, 0);
+                WriteFile (err, "\r\n", 2, & written, 0);
+
+                /*
+                 * If the status is 0, then we've hit the target host and that
+                 * means we should stop and return 1.
+                 */
+
+                if (reply->Status == 0 || reply->Address == dest)
+                        break;
+
+                /*
+                 * If the pattern is empty, we're just printing results.
+                 */
+
+                if (pattern == 0 || * pattern == 0)
                         continue;
 
                 /*
@@ -389,15 +447,30 @@ int CALLBACK myWinMain (void) {
         wchar_t       * extra = split (port);
         if (port == 0)
                 return 2;
+
         WSADATA         wsaData;
         if (WSAStartup (MAKEWORD (2, 2), & wsaData) != 0)
                 return 2;
 
-
         int             result;
         if (wcscmp (port, L"icmp") == 0) {
-                result = trace (name, extra, err);
+                wchar_t       * find = extra;
+                extra = split (find);
+                if (find == 0 || * find == 0) {
+                        /*
+                         * If there is no third argument, just print the names
+                         * of the first few systems we find.
+                         */
+
+                        find = 0;
+                } else if (extra == 0)
+                        err = INVALID_HANDLE_VALUE;
+
+                result = trace (name, find, err);
         } else {
+                if (extra == 0)
+                        err = INVALID_HANDLE_VALUE;
+
                 result = probe (name, port, err);
         }
 

@@ -259,8 +259,8 @@ isps = {
     # server selections that work well most of the time may end up being less
     # than optimal during load spikes such as Steam sales.
 
-    13: { 'name': 'Optus Australia', 'server': '111.119.10.2',
-          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14' },
+    13: { 'name': 'Optus Australia', 'server': '49.143.234.14',
+          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14;content?.steampowered.com=49.143.234.14,111.119.10.2' },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
     # where iPrimus list their unmetered servers, and suggests this rule:
@@ -300,6 +300,7 @@ isps = {
     32: { 'name': 'Telkom SAIX, South Africa', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server',
           'test': {
+              'report': True,
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/SAIX dual ISP',
@@ -311,6 +312,7 @@ isps = {
     33: { 'name': 'MWeb, South Africa', 'server': '196.28.69.201',
           'filter': '*:27030=196.28.69.201,196.28.169.201',
           'test': {
+              'report': True,
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/MWeb dual ISP',
@@ -322,6 +324,7 @@ isps = {
     34: { 'name': 'Cybersmart, South Africa', 'server': '0.0.0.0',
           'filter': '# No known Steam server for Cybersmart',
           'test': {
+              'report': True,
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/Cybersmart dual ISP',
@@ -331,16 +334,24 @@ isps = {
           }
         },
 
-
     # Slots 35-39 are reserved for future South African ISPs
 
     # Iceland is tricky; like a lot of countries, there's a former state
-    # monopoly which has a lot of DSL users, but they don't run a Steam server,
-    # but only Vodafone do now and it's filtered so I can't easily find out
-    # whether it has HTTP support.    
+    # monopoly which has a lot of DSL users, but they don't run a Steam server.
+    # Only Vodafone do now and it's filtered so I can't easily find out whether
+    # it has HTTP support enabled, hence the filter test.
 
     40: { 'name': 'Vodafone Iceland', 'server': '193.4.194.101',
-          'filter': '*:27030=193.4.194.101' },
+          'filter': '*:27030=193.4.194.101',
+          'test': {
+              'report': True,
+              '193.4.194.101 80': {
+                  0: {
+                      'filterrule': '*:27030=193.4.194.101;content?.steampowered.com=193.4.194.101'
+                  }
+              }
+          }
+        },
 
     # Regularly installs turn up from Google netblocks; possibly this is part
     # of sandboxed malware scanning of Google Code downloads, but equally for

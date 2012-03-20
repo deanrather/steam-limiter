@@ -204,6 +204,37 @@ static  char            head [] = "HEAD /favicon.ico HTTP/1.0\n\n";
 }
 
 /**
+ * Address query.
+ *
+ * Note that this leaks memory, intentionally since the hosting process is
+ * ephemeral rather than long-running.
+ */
+
+ADDRINFOW * getIpv4 (wchar_t * host, wchar_t * port) {
+        /*
+         * Look up the hostname and convert the port number into numeric form,
+         * all handily in one function.
+         */
+
+        ADDRINFOW     * address;
+        if (GetAddrInfoW (host, port, 0, & address) != 0)
+                return 0;
+
+        /*
+         * Ensure that we only connect via IPv4, having made an IPv4 socket
+         * already (yes, I could do things in a different order, but for my
+         * purposes here with Steam I care about IPv4 only for now since they
+         * are IPv4-only).
+         */
+
+        while (address->ai_addr->sa_family != AF_INET)
+                if ((address = address->ai_next) == 0)
+                        break;
+
+        return address;
+}
+
+/**
  * Probe for the indicated port at the given host.
  */
 
@@ -236,25 +267,9 @@ int probe (wchar_t * host, wchar_t * port, HANDLE show) {
         if (bind (s, (sockaddr *) & any, sizeof (any)) != 0)
                 return 2;
 
-        /*
-         * Look up the hostname and convert the port number into numeric form,
-         * all handily in one function.
-         */
-
-        ADDRINFOW     * address;
-        if (GetAddrInfoW (host, port, 0, & address) != 0)
+        ADDRINFOW     * address = getIpv4 (host, port);
+        if (address == 0)
                 return 2;
-
-        /*
-         * Ensure that we only connect via IPv4, having made an IPv4 socket
-         * already (yes, I could do things in a different order, but for my
-         * purposes here with Steam I care about IPv4 only for now since they
-         * are IPv4-only).
-         */
-
-        while (address->ai_addr->sa_family != AF_INET)
-                if ((address = address->ai_next) == 0)
-                        return 2;
 
         /*
          * Just test whether the port is open or not.
@@ -309,20 +324,9 @@ int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
          * Resolve an IPv4 hostname.
          */
 
-        ADDRINFOW     * address;
-        if (GetAddrInfoW (host, 0, 0, & address) != 0)
+        ADDRINFOW     * address = getIpv4 (host, 0);
+        if (address == 0)
                 return 2;
-
-        /*
-         * Ensure that we only connect via IPv4, having made an IPv4 socket
-         * already (yes, I could do things in a different order, but for my
-         * purposes here with Steam I care about IPv4 only for now since they
-         * are IPv4-only).
-         */
-
-        while (address->ai_addr->sa_family != AF_INET)
-                if ((address = address->ai_next) == 0)
-                        return 2;
 
         sockaddr_in   * addr = (sockaddr_in *) address->ai_addr;
         IPAddr          dest = addr->sin_addr.s_addr;
@@ -426,6 +430,90 @@ int trace (wchar_t * host, wchar_t * pattern, HANDLE err) {
 }
 
 /**
+ * For doing rough speed comparisons, obtain the equivalent of an average ping
+ * time to a host.
+ */
+
+int pingTime (wchar_t * host, HANDLE err) {
+        HANDLE          icmp = IcmpCreateFile ();
+        if (icmp == INVALID_HANDLE_VALUE)
+                return 9999;
+
+        /*
+         * First consider treating the hostname as a number to give a fixed
+         * benchmark ping time.
+         */
+
+        unsigned long   total = 0;
+        wchar_t       * scan = host;
+        for (;;) {
+                wchar_t         ch = * scan ++;
+                if (ch == 0)
+                        return total;
+
+                if ((ch -= '0') > 9)
+                        break;
+
+                total = total * 10 + ch;
+        }
+
+        /*
+         * Resolve an IPv4 hostname.
+         */
+
+        ADDRINFOW     * address = getIpv4 (host, 0);
+        if (address == 0)
+                return 9999;
+
+        sockaddr_in   * addr = (sockaddr_in *) address->ai_addr;
+        IPAddr          dest = addr->sin_addr.s_addr;
+
+        int             i;
+        unsigned long   count = 0;
+        total = 0;
+
+        /*
+         * Gather up to 4 round-trip-time measurements from timestamped ICMP
+         * echo frames (using the handy Win32 API for that purpose).
+         */
+
+        for (i = 0 ; i < 4 ; ++ i) {
+                unsigned char   buf [128];
+                DWORD           echo;
+                echo = IcmpSendEcho (icmp, dest, 0, 0, 0, buf,
+                                     sizeof (buf), 500);
+                if (echo < 1)
+                        continue;
+
+                ICMP_ECHO_REPLY * reply = (ICMP_ECHO_REPLY *) buf;
+                if (reply->Status != IP_TTL_EXPIRED_TRANSIT && reply->Status != 0)
+                        return 1;
+
+                char            text [80];
+                wsprintfA (text, "%.50ls %ld\r\n", host, reply->RoundTripTime);
+                unsigned long   written = 0;
+                WriteFile (err, text, strlen (text), & written, 0);
+
+                total += reply->RoundTripTime;
+                ++ count;
+        }
+
+        return count == 0 ? 99999 : total / count;
+}
+
+/**
+ * Compare two sets of ping times.
+ */
+
+int pings (wchar_t * host, wchar_t * other, HANDLE err) {
+        /*
+         * Resolve an IPv4 hostname.
+         */
+
+        return pingTime (host, err) <= pingTime (other, err) ? 0 : 1;
+}
+
+/**
  * This is intended as a "naked" WinMain without the Visual C++ run-time
  * at all (not just avoiding the broken locale machinery).
  */
@@ -444,7 +532,9 @@ int CALLBACK myWinMain (void) {
         wchar_t       * base = GetCommandLineW ();
         wchar_t       * name = split (base);
         wchar_t       * port = split (name);
-        wchar_t       * extra = split (port);
+        wchar_t       * find = split (port);
+        wchar_t       * extra = split (find);
+
         if (port == 0)
                 return 2;
 
@@ -452,10 +542,21 @@ int CALLBACK myWinMain (void) {
         if (WSAStartup (MAKEWORD (2, 2), & wsaData) != 0)
                 return 2;
 
+typedef int          (* Func) (wchar_t * left, wchar_t * right, HANDLE out);
+        Func            func;
+
         int             result;
-        if (wcscmp (port, L"icmp") == 0) {
-                wchar_t       * find = extra;
-                extra = split (find);
+        if (wcscmp (port, L"versus") == 0 || wcscmp (port, L"vs") == 0) {
+                /*
+                 * Compare ping times of two hosts.
+                 */
+
+                func = pings;
+        } else if (wcscmp (port, L"icmp") == 0) {
+                /*
+                 * Perform a traceroute, match a hostname part.
+                 */
+
                 if (find == 0 || * find == 0) {
                         /*
                          * If there is no third argument, just print the names
@@ -463,16 +564,23 @@ int CALLBACK myWinMain (void) {
                          */
 
                         find = 0;
-                } else if (extra == 0)
-                        err = INVALID_HANDLE_VALUE;
+                        extra = L"";
+                }
 
-                result = trace (name, find, err);
+                func = trace;
         } else {
-                if (extra == 0)
-                        err = INVALID_HANDLE_VALUE;
+                /*
+                 * Test for an open port on a host.
+                 */
 
-                result = probe (name, port, err);
+                extra = find;
+                find = port;
+                func = probe;
         }
+
+        if (extra == 0)
+                err = INVALID_HANDLE_VALUE;
+        result = (* func) (name, find, err);
 
         if (extra == 0)
                 ExitProcess (result);

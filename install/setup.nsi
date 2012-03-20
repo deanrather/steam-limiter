@@ -118,7 +118,7 @@ Function quitProgram
    * called ExitProcess.
    */
 
-  Sleep 10
+  Sleep 20
 FunctionEnd
 
 Section
@@ -150,18 +150,24 @@ upgrade:
    * be confused by things like explorer.exe windows named "Steam" and so could
    * end up with the DLL injected in multiple places. Renaming the in-use DLL
    * works, so do that and then force it to be deleted.
+   *
+   * This also helps when Windows is just being stupid and hanging onto an open
+   * references to an executable even though the process has exited.
    */
 
   Rename $INSTDIR\steamfilter.dll $INSTDIR\temp.dll
-  Delete /REBOOTOK $INSTDIR\temp.dll
+  Rename $INSTDIR\steamlimit.exe $INSTDIR\temp.exe
 
   SetOutPath $INSTDIR
   WriteUninstaller $INSTDIR\uninst.exe
 
   FILE ${OutDir}\probe.exe
+  File ..\scripts\setfilter.js
   File ${OutDir}\steamlimit.exe
   File ${OutDir}\steamfilter.dll
-  File ..\scripts\setfilter.js
+
+  Delete /REBOOTOK $INSTDIR\temp.dll
+  Delete /REBOOTOK $INSTDIR\temp.exe
 
   /*
    * Set the registry keys for the version options; from time to time we can
@@ -296,9 +302,10 @@ Section "Uninstall"
    * called ExitProcess.
    */
 
-  Sleep 10
+  Sleep 20
 
   Delete $INSTDIR\uninst.exe
+  Delete $INSTDIR\probe.exe
   Delete $INSTDIR\steamlimit.exe
   Delete $INSTDIR\steamfilter.dll
   RMDir $INSTDIR

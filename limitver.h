@@ -34,13 +34,14 @@
 #define VER_MAJOR       0
 #define VER_MINOR       5
 #define VER_BUILD       3
-#define VER_REV         2
+#define VER_REV         3
 
 #define VAL(x)                  #x
 #define STR(x)                  VAL (x)
 
 /**
- * File and product version information used by the sf2.rc resource script.
+ * File and product version information used by the steam-limiter resource
+ * scripts.
  * @{
  */
 

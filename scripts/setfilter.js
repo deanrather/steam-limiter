@@ -363,17 +363,21 @@ function probeTests (bundle) {
             return;
         }
 
+        var merge = choices [result];
+
         /*
-         * As this is a beta build and I want to see how the per-ISP tests work,
-         * send the raw result data to the webservice for logging. It would be
-         * nice to be able to keep something like this for full builds as well,
-         * to periodically check New Zealand ISPs for whether they have finally
-         * got around to opening port 80 on their Steam servers.
+         * Test sequences have the option of requesting data be sent back; this
+         * is for verifying that the test system is working, and for improving
+         * the central rule selection if a proposed rule tests out everywhere.
+         * Test results and IP addresses are discarded after 90 days, just as
+         * all the webservice logging information is (feedback and rule items
+         * can be stored longer, but no association with any IP data remains).
          */
 
-        /* if (choices.report) */
-        simplePost ("testreport?test=" + escape (test) +
-                    "&result=" + escape (result));
+        if (choices.report || merge.report) {
+            simplePost ("testreport?test=" + escape (test) +
+                        "&result=" + escape (result));
+        }
 
         /*
          * Now, if the return result of the probe matches one of the selections
@@ -381,7 +385,6 @@ function probeTests (bundle) {
          * bundle and return.
          */
 
-        var merge = choices [result];
         if (! merge)
             continue;
 

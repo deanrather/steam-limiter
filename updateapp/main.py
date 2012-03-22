@@ -162,7 +162,9 @@ def find_netblock (ip):
 
     if type (ip) == str:
         logging.warning ('Unknown mapping for IPv4 address ' + ip)
+
     return - 1
+
 
 # The ISP indexes I use in the netblock table
 #
@@ -362,10 +364,13 @@ isps = {
           'filter': '# What Steam server do Google use...?' },
 
     # I really have no idea what's going on with installs from Comcast netblocks
-    # so I'd hope one day someone using one bothers to explain it to me.
+    # so I'd hope one day someone using one bothers to explain it to me. I've
+    # also seen a few installs from AT&T as well, equally baffling.
 
     60: { 'name': 'Comcast Communications', 'server': '0.0.0.0',
-          'filter': '# No known Steam server for Comcast' }
+          'filter': '# No rules for Comcast, please suggest some!' },
+    61: { 'name': 'AT&T Internet Services', 'server': '0.0.0.0',
+          'filter': '# No rules for AT&T, please suggest some!' }
 }
 
 # Simplified writer for templates

@@ -645,6 +645,7 @@ unsigned char * writeOffset (unsigned char * dest, unsigned long value) {
 
 /**
  * Code-generation stuff.
+ * @{
  */
 
 #define PUSH_IMM8       0x6A
@@ -653,6 +654,10 @@ unsigned char * writeOffset (unsigned char * dest, unsigned long value) {
 
 #define MOV_EDI_EDI     0xFF8B
 #define JMP_SHORT_MINUS5 (0xF900 + JMP_SHORT)
+
+#define JMP_INDIRECT    0x25FF
+
+/**@}*/
 
 /**
  * Record our HMODULE value for unloading.
@@ -741,20 +746,36 @@ bool ApiHook :: attach (void * address, FARPROC hook) {
         memcpy (m_save, data - 5, 8);
         m_resume = 0;
 
-        if (* (unsigned short *) data == MOV_EDI_EDI) {
+        unsigned short  word = * (unsigned short *) data;
+        if (word == MOV_EDI_EDI) {
                 /*
                  * No need for a thunk, the resume point can be where we want.
                  */
 
                 m_resume = (FARPROC) (data + 2);
         } else if (* data == PUSH_IMM8) {
+                /*
+                 * For inet_addr where the initial hook MOV, EDI, EDI is absent
+                 * but the hook region is still there.
+                 */
+
                 m_resume = makeThunk (data, 2);
+        } else if (word == JMP_INDIRECT) {
+                /*
+                 * This is used by some rather lame API rewriting done by very
+                 * obscure code called Emsisoft Anti-Malware. It's really easy
+                 * to defeat if you know it's there, but it's probably relying
+                 * on being so obscure and used by so few people that there's
+                 * not really any point for actual malware to disable it.
+                 */
+
+                m_resume = makeThunk (data, 6);
         } else
                 return false;
 
         /*
-         * Write a branch to the hook stub over the initial NOP of the target
-         * function.
+         * Write a branch to the hook stub over the initial NOP (or other code,
+         * if the function is already detoured somehow) of the target.
          */
 
         unsigned long   protect = 0;
@@ -766,6 +787,11 @@ bool ApiHook :: attach (void * address, FARPROC hook) {
          * for just this purpose in code compiled for patching), then put the
          * short branch to the long jump in the two-byte slot at the regular
          * function entry point.
+         *
+         * If there's a previous detour which used the hook slot, then above it
+         * would have been saved and we'll use that as the continue point. If
+         * something else entirely is going on we'll have built a special thunk
+         * in m_thunk for the continue point.
          */
 
         data [- 5] = JMP_LONG;

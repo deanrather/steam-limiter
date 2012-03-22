@@ -476,6 +476,12 @@ bool FilterRule :: parseReplace (const wchar_t * from, const wchar_t * to,
                  * resolution result in no replacement.
                  */
 
+#if     1
+                char            example [80];
+                wsprintfA (example, "Failed to resolve %ls: %x\r\n", from, result);
+                OutputDebugStringA (example);
+#endif
+
                 free (mem);
                 return true;
         }
@@ -493,6 +499,11 @@ bool FilterRule :: parseReplace (const wchar_t * from, const wchar_t * to,
                  */
 
                 if ((choices = choices->ai_next) == 0) {
+#if     1
+                        char            example [80];
+                        wsprintfA (example, "No IPv4 for %ls\r\n", from);
+                        OutputDebugStringA (example);
+#endif
                         free (mem);
                         return true;
                 }

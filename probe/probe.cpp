@@ -506,10 +506,6 @@ int pingTime (wchar_t * host, HANDLE err) {
  */
 
 int pings (wchar_t * host, wchar_t * other, HANDLE err) {
-        /*
-         * Resolve an IPv4 hostname.
-         */
-
         return pingTime (host, err) <= pingTime (other, err) ? 0 : 1;
 }
 

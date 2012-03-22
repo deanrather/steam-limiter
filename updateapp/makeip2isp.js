@@ -152,9 +152,11 @@ function readFile (file) {
 
         "AS7922": 60,   /* actually seen this one used */
         "AS21508": 60,  /* actually seen this one used */
-        "AS33490": 60   /* actually seen this one used */
+        "AS33490": 60,  /* actually seen this one used */
 
-/* Holding off on enabling all of these until I know more
+	"AS7132": 61	/* AT&T Internet Services */
+
+/* Holding off on enabling all of these Comcast ASNs until I know more
         "AS7015": 60,
         "AS7016": 60,
         "AS7725": 60,

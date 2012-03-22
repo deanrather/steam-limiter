@@ -110,6 +110,8 @@ function readFile (file) {
         "AS4739": 11,   /* Internode */
         "AS4802": 12,   /* iiNet (Adelaide, SA) */
         "AS4854": 12,   /* Netspace Online Systems (Melbourne), now iiNet */
+        "AS2764": 12,   /* AAPT, apparently also part of iiNet */
+
         "AS7474": 13,   /* SingTel Optus */
         "AS4804": 13,   /* Microplex PTY LTD, owned by Singtel Optus */
         "AS9443": 14,   /* iPrimus aka Primus Telecommunications */

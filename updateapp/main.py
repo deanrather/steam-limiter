@@ -263,6 +263,10 @@ isps = {
     # slot in the long term, but for now I'll leave the old branding in
     # place since it doesn't seem like they have completely gone, even
     # though they have identical rules now.
+    #
+    # Update: According to an iiNet rep, the iiNet list is currently shorter
+    # than the full Internode one.
+    # http://forums.whirlpool.net.au/forum-replies.cfm?t=1888406#r33536585
 
     11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,' +
@@ -271,11 +275,9 @@ isps = {
                     'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
                     'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net' },
     12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
-          'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,' +
-                    'steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,' +
-                    'steam-wa.3fl.net.au,steam-nsw.3fl.net.au,ga17.gamearena.com.au,' +
-                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net' },
+          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +
+                    'steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net;' +
+                    'content?.steampowered.com=steam.cdn.on.net' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
     # these server selections are intended more for download performance than

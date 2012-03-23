@@ -254,9 +254,10 @@ isps = {
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au
     #
-    # During 2011 Internode bought iiNet outright, and as of today 23-Mar-2012
+    # During 2011 Internode developed some kind of tie-up with iiNet (the
+    # exact nature of which is somewhat obscure), and as of 23-Mar-2012
     # (thanks to a heads-up from a rule upload) I've found out that the
-    # merger has progressed further:
+    # integration between them has progressed further:
     # http://www.3fl.net.au/2012/03/23/internode-joins-iinets-freezone/
     #
     # It may be better to just fold iiNet into Internode and free up the

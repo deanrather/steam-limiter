@@ -203,8 +203,26 @@ function readFile (file) {
         var asid = line.match (getId)
         var id = mapping [asid];
 
-        if (id === undefined)
+        /*
+         * If two consecutive lines have the same ASN, then merge their
+         * start and end even if the IP ranges don't quite line up - this
+         * used to be handled by a number check but the Maxmind data for
+         * iiNet has a strange sequence of "holes" in it and I've had an
+         * install from one of those "hole" ranges, which the Hurricane
+         * Electric data assigns to iiNet.
+         */
+
+        var merge = prev && prev.id === id;
+
+        if (id === undefined) {
+            /*
+             * Clear the "prev" here so that the above check takes note
+             * of adjacent line positions in the source CSV file.
+             */
+
+            prev = null;
             continue;
+        }
 
         /*
          * The CSV syntax uses double-doublequotes, convert that to the C-style
@@ -229,8 +247,7 @@ function readFile (file) {
          * If the new range and the previous can be merged, merge them.
          */
 
-        if (prev && prev.end + 1 === range.start && prev.id === id) {
-            WScript.Echo ("Merging");
+        if (merge) {
             range.start = prev.start;
             result.pop ();
         }

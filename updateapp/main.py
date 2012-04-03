@@ -338,6 +338,7 @@ isps = {
     30: { 'name': 'Internet Solutions (Johannesburg, South Africa)', 'server': '196.38.180.3',
           'filter': '*:27030=steam.isgaming.co.za',
           'test': {
+              'report': True,
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/IS dual ISP',

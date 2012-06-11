@@ -363,7 +363,7 @@ function probeTests (bundle) {
             return;
         }
 
-        var merge = choices [result];
+        var merge = choices && choices [result];
 
         /*
          * Test sequences have the option of requesting data be sent back; this
@@ -374,7 +374,7 @@ function probeTests (bundle) {
          * can be stored longer, but no association with any IP data remains).
          */
 
-        if (choices.report || merge.report) {
+        if ((choices && choices.report) || (merge && merge.report)) {
             simplePost ("testreport?test=" + escape (test) +
                         "&result=" + escape (result));
         }

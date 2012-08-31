@@ -109,7 +109,8 @@ def stringip_to_number (text):
 
 ipv6_prefixes = {
     "2001:4400:": 0,    # TelstraClear New Zealand
-    "2001:44B8:": 11    # Internode Australia
+    "2001:44B8:": 11,   # Internode Australia
+    "2406:E000:": 2	# Snap! New Zealand
 };
 
 # Find any matching tuple inside the ip_match.ip_table list, which is sorted,

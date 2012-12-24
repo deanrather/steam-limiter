@@ -40,11 +40,12 @@
  */
 
 #include "../nolocale.h"
+#include "../limitver.h"
+
 #include <winsock2.h>
 
 #include "glob.h"
 #include "filterrule.h"
-
 
 /**
  * For declaring exported callable functions from the injection shim.
@@ -132,6 +133,22 @@ typedef BOOL  (WSAAPI * WSAGetOverlappedFunc) (SOCKET s, OVERLAPPED * overlapped
                                                unsigned long * flags);
 
 /**
+ * Prototype for getpeername (), which we don't hook but do want to call.
+ */
+
+typedef int   (WSAAPI * getpeernameFunc) (SOCKET s, sockaddr * addr, int * length);
+
+/**
+ * Simple equivalent to ntohs.
+ *
+ * I don't want a static DLL dependency against ntohs () and this is easier
+ * than making the dependency fully dynamic.
+ */
+
+#define ntohs(x)        ((unsigned char) ((x) >> 8) + \
+                         ((unsigned char) (x) << 8))
+
+/**
  * For representing hooked functions, and wrapping up the hook and unhook
  * machinery.
  *
@@ -175,6 +192,7 @@ struct Hook : public ApiHook {
 
 /**
  * Hook structures for all the things we want to intercept.
+ * @{
  */
 
 Hook<ConnectFunc>       g_connectHook;
@@ -187,8 +205,12 @@ Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedHook;
 Hook<SendFunc>          g_sendHook;
 Hook<WSASendFunc>       g_wsaSendHook;
 
+getpeernameFunc         g_getpeername;
+
+/**@}*/
+
 /**
- * The Telstra IP address we're after in network byte order.
+ * This holds all the rules we apply.
  */
 
 FilterRules     g_rules (27030);
@@ -247,7 +269,13 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                 return SOCKET_ERROR;
         }
 
-        OutputDebugStringA ("Connect redirected\r\n");
+        char            show [128];
+        unsigned char * bytes = & replace->sin_addr.S_un.S_un_b.s_b1;
+        wsprintfA (show, "Connect redirected to %d.%d.%d.%d:%d\r\n",
+                   bytes [0], bytes [1], bytes [2], bytes [3],
+                   ntohs (replace->sin_port));
+
+        OutputDebugStringA (show);
 
         /*
          * Redirect the connection; put the rewritten address into a temporary
@@ -299,7 +327,15 @@ struct hostent * WSAAPI gethostHook (const char * name) {
                 return 0;
         }
 
+#if     0
+        /*
+         * This gets called a *lot* during big downloads, so it's less useful
+         * having it here now, especially since the port 27030 CDN is now very
+         * much deprecated.
+         */
+
         OutputDebugStringA ("gethostbyname redirected\r\n");
+#endif
 
         /*
          * Replacing a DNS result raises the question of storage, which for
@@ -476,21 +512,77 @@ BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
 }
 
 /**
+ * Sort-of equivalent to memicmp () for comparing HTTP header strings.
+ *
+ * Not using actual memicmp () just because of the broken locale machinery in
+ * the VC++ RTL; this only cares about the C locale (i.e., ASCII).
+ */
+
+int c_memicmp (const void * leftBuf, const void * rightBuf, size_t length) {
+typedef const unsigned char   * Str;
+        Str             left = (Str) leftBuf;
+        Str             right = (Str) rightBuf;
+
+        while (length > 0) {
+                unsigned char   lChar = * left;
+                if (lChar > 'a' && lChar <= 'z')
+                        lChar -= 32;
+                unsigned char   rChar = * right;
+                if (rChar > 'a' && rChar <= 'z')
+                        rChar -= 32;
+
+                if (lChar != rChar)
+                        return lChar < rChar ? - 1 : 1;
+
+                ++ left;
+                ++ right;
+                -- length;
+        }
+
+        return 0;
+}
+
+/**
+ * Sort-of equivalent to strstr () for a HTTP header buffer.
+ */
+
+const char * c_memifind (const char * buf, const char * find, size_t length) {
+        size_t          need = strlen (find);
+        while (length >= need) {
+                if (c_memicmp (buf, find, need) == 0)
+                        return buf + need;
+
+                /*
+                 * Just slide one; fancier string matching algorithms like KMP
+                 * or Boyer-Moore get their acceleration by doing clever things
+                 * particularly with sliding (including matching from the
+                 * rightmost edge of the pattern first, so they can slide the
+                 * furthest amount).
+                 */
+
+                -- length;
+                ++ buf;
+        }
+
+        return 0;
+}
+
+/**
  * Apply URL filters.
  */
 
-const char * filterHttpUrl (const char * buf, size_t & length) {
+const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
         if (length < 10)
                 return buf;
-        
+
         /*
          * The Steam client uses upper-case verb text, so we keep things simple.
          */
 
         size_t          verb = 0;
-        if (memcmp (buf, "GET /", 5) == 0) {
+        if (c_memicmp (buf, "GET /", 5) == 0) {
                 verb = 4;
-        } else if (memcmp (buf, "POST /", 6) == 0)
+        } else if (c_memicmp (buf, "POST /", 6) == 0)
                 verb = 5;
 
         if (verb == 0)
@@ -503,18 +595,101 @@ const char * filterHttpUrl (const char * buf, size_t & length) {
 
         const char    * end = (const char *) memchr (buf + verb, ' ', length);
         size_t          tempLen = end == 0 ? 0 : end - buf;
-        char            temp [128];
-        if (tempLen == 0 || tempLen + 2 >= sizeof (temp))
+        char            temp [256];
+
+        if (tempLen == 0)
                 return buf;
 
-        memcpy (temp, buf, tempLen);
-        strcpy (temp + tempLen, "\r\n");
+        /*
+         * To make filters more selective, find the host: header if supplied.
+         *
+         * Header parsing in HTTP is like header parsing in SMTP, and that is
+         * way more complex than I want to bother with here. Since I'm just
+         * faking out some simple hand-writter HTTP client code in STEAM rather
+         * than doing a full filter, just look for the simple case. In reality,
+         * for security purposes against a hostile target you do need to go the
+         * whole way with a spec-compliant parser.
+         */
+
+        const char    * host = c_memifind (buf + tempLen, "host: ", length - tempLen);
+        size_t          hostLength = 0;
+        if (host != 0) {
+                const char    * hostEnd;
+                hostEnd = (const char *) memchr (host, '\r', buf + length - host);
+                if (hostEnd != 0)
+                        hostLength = hostEnd - host + 2;
+        }
+
+        char          * dest = temp;
+
+        /*
+         * Use getPeerName () so I can show the actual target IP in the debug
+         * output, to contrast against the Host: value.
+         */
+
+        sockaddr_storage addr;
+        int             addrLen = sizeof (addr);
+        if (g_getpeername (s, (sockaddr *) & addr, & addrLen) == 0 &&
+            addr.ss_family == AF_INET) {
+                sockaddr_in   & in4 = (sockaddr_in &) addr;
+                unsigned char * bytes = & in4.sin_addr.S_un.S_un_b.s_b1;
+                wsprintfA (dest, "%d.%d.%d.%d:%d ",
+                           bytes [0], bytes [1], bytes [2], bytes [3],
+                           ntohs (in4.sin_port));
+
+                dest += strlen (dest);
+        }
+
+        /*
+         * If the requested URL is excessively large, truncate it (it gets big
+         * because of useless query parameters Valve attach for debug/tracking,
+         * that don't factor into what we care about).
+         */
+
+        size_t          avail = temp + sizeof (temp) - dest;
+
+        if (tempLen + hostLength + 3 > avail) {
+                if (hostLength + 3 > avail)
+                        return buf;
+
+                tempLen = avail - hostLength - 3;
+        }
+
+        memcpy (dest, buf, verb);
+        dest += verb;
+
+        if (hostLength > 0) {
+                * dest = '[';
+                memcpy (dest + 1, host, hostLength - 2);
+                dest [hostLength - 1] = ']';
+                dest += hostLength;
+        }
+
+        const char    * urlPart = dest;
+        memcpy (dest, buf + verb, tempLen - verb);
+        dest += tempLen - verb;
+
+        strcpy (dest, "\r\n");
+
         OutputDebugStringA (temp);
-        temp [tempLen] = 0;
+        * dest = 0;
+
+        /*
+         * Now run the match against the URL.
+         */
 
         const char    * replace = 0;
-        if (! g_rules.match (temp + verb, & replace))
+        if (! g_rules.match (urlPart, & replace)) {
+                /*
+                 * If I wanted, instead of passing through now that I'm getting
+                 * the host data out, I can try a different match against just
+                 * the host part of the string - I'm curious if I might want to
+                 * do this to more firmly nail down the "CS" content server
+                 * type.
+                 */
+
                 return buf;
+        }
 
         /*
          * An empty pattern means block.
@@ -579,7 +754,7 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
         const char    * buf = buffers [0].buf;
         size_t          len = buffers [0].len;
-        buf = filterHttpUrl (buf, len);
+        buf = filterHttpUrl (s, buf, len);
 
         if (buf == 0) {
                 OutputDebugStringA ("Blocking HTTP request\r\n");
@@ -929,12 +1104,14 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
                                                    ws2, "WSAGetOverlappedResult") &&
                   g_wsaSendHook.attach (wsaSendHook, ws2, "WSASend");
 
+        g_getpeername = (getpeernameFunc) GetProcAddress (ws2, "getpeername");
+
         if (! success) {
                 unhookAll ();
                 return ~ 0UL;
         }
 
-        OutputDebugStringA ("SteamFilter hook attached\n");
+        OutputDebugStringA ("SteamFilter " VER_PRODUCTVERSION_STR " attached\n");
 
         /*
          * Since we loaded OK, we want to stay loaded; add one to the refcount
@@ -962,7 +1139,7 @@ void removeHook (void) {
                 return;
 
         unhookAll ();
-        OutputDebugStringA ("SteamFilter unhooked\n");
+        OutputDebugStringA ("SteamFilter " VER_PRODUCTVERSION_STR " unhooked\n");
 }
 
 /**

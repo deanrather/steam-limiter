@@ -65,8 +65,11 @@ void * __cdecl _getptd_noexit (void) {
         return 0;
 }
 
+#if     _MSC_VER < 1700
+
 /**
- * Fake FLS allocator/set/get routines.
+ * Fake FLS allocator/set/get routines. On VS2012 with AMD64 these are in a new
+ * API wrapping file called winapisupp so they aren't as easy to shoot down.
  */
 
 DWORD WINAPI __crtFlsAlloc (PFLS_CALLBACK_FUNCTION) {
@@ -85,6 +88,8 @@ BOOL WINAPI __crtFlsFree (DWORD) {
         return TRUE;
 }
 
+#endif
+
 void __cdecl _init_pointers (void);
 void __cdecl _mtinitlocks (void);
 
@@ -96,11 +101,50 @@ void __cdecl _mtinit (void) {
         if (kernel == 0)
                 return;
 
+#if     _MSC_VER < 1700
         gpFlsAlloc = EncodePointer (__crtFlsAlloc);
         gpFlsGetValue = EncodePointer (__crtFlsGetValue);
         gpFlsSetValue = EncodePointer (__crtFlsSetValue);
         gpFlsFree = EncodePointer (__crtFlsFree);
+#endif
 }
+
+#if     _MSC_VER > 1600 || __AMD64__
+
+struct {
+        int             refcount;
+} __initialmbcinfo;
+void * __ptmbcinfo = & __initialmbcinfo;
+
+void * __cdecl __updatetmbcinfo (void) {
+        return 0;
+}
+
+#endif
+
+#if     _MSC_VER > 1600
+
+/*
+ * In Visual Studio 2010 and 2012 and presumably going forward, the DinkumWare
+ * iostreams are all built strictly on top of classic POSIX fopen (), making
+ * them interoperate well but adding quite a lot to the legacy drag. We don't
+ * want these to exist.
+ *
+ * In VS2012 Update 1, the init function name changed from ioinit0 to ioinit.
+ */
+
+void * _stdbuf [2];
+
+void __cdecl _ioinit (void) {
+}
+
+void __cdecl _ioinit0 (void) {
+}
+
+void __cdecl _ioterm (void) {
+}
+
+#endif
 
 void __cdecl _mtdeletelocks (void);
 

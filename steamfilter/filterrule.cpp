@@ -928,7 +928,16 @@ bool FilterRules :: match (const sockaddr_in * name, void * module,
                    name->sin_addr.S_un.S_un_b.s_b4,
                    port);
 
+#if     0
+        /*
+         * There are more debug tell-tales elsewhere now, and since I'm not
+         * doing any debug on the rule system itself at present this creates
+         * noise in the rest of the debug logging (which I'm cleaning up for
+         * field debug purposes for v0.5.5).
+         */
+
         OutputDebugStringA (example);
+#endif
 
         EnterCriticalSection (l_filterLock);
 

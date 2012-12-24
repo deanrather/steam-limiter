@@ -32,6 +32,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "..\nolocale.h"
+
 #include <winsock2.h>
 #include <ws2tcpip.h>
 

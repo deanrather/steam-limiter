@@ -269,14 +269,6 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                 return SOCKET_ERROR;
         }
 
-        char            show [128];
-        unsigned char * bytes = & replace->sin_addr.S_un.S_un_b.s_b1;
-        wsprintfA (show, "Connect redirected to %d.%d.%d.%d:%d\r\n",
-                   bytes [0], bytes [1], bytes [2], bytes [3],
-                   ntohs (replace->sin_port));
-
-        OutputDebugStringA (show);
-
         /*
          * Redirect the connection; put the rewritten address into a temporary
          * so the change isn't visible to the caller (Steam doesn't appear to
@@ -290,6 +282,18 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                         base->sin_port;
         temp.sin_addr = replace->sin_addr.S_un.S_addr != 0 ?
                         replace->sin_addr : base->sin_addr;
+
+        /*
+         * Describe the redirection for the benefit of DbgView
+         */
+
+        char            show [128];
+        unsigned char * bytes = & temp.sin_addr.S_un.S_un_b.s_b1;
+        wsprintfA (show, "Connect redirected to %d.%d.%d.%d:%d\r\n",
+                   bytes [0], bytes [1], bytes [2], bytes [3],
+                   ntohs (temp.sin_port));
+
+        OutputDebugStringA (show);
                 
         return (* g_connectHook) (s, (sockaddr *) & temp, sizeof (temp));
 }

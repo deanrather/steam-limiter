@@ -73,7 +73,7 @@ BEGIN
             VALUE "FileVersion",      VER_FILEVERSION_STR
             VALUE "InternalName",     "Steam Content Server Monitor"
             VALUE "LegalCopyright",   VER_COPYRIGHT_STR
-            VALUE "OriginalFilename", "STEAMLIMITER.EXE"
+            VALUE "OriginalFilename", "steamlimit.exe"
             VALUE "ProductName",      VER_PRODUCTNAME_STR
             VALUE "ProductVersion",   VER_PRODUCTVERSION_STR
             VALUE "Website",          VER_WEBSITE_STR

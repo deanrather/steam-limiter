@@ -62,4 +62,9 @@
       <Filter>Source Files</Filter>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\LICENSE.txt">
+      <Filter>Source Files</Filter>
+    </Text>
+  </ItemGroup>
 </Project>

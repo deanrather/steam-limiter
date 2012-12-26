@@ -45,6 +45,9 @@
   <ItemGroup>
     <ClInclude Include="..\limitver.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\LICENSE.txt" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{9C48C342-10C8-497B-BFBE-E92F52AA3673}</ProjectGuid>
     <RootNamespace>steamfilter</RootNamespace>

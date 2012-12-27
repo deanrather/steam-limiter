@@ -318,7 +318,7 @@ isps = {
 
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam1.syd7.internode.on.net,' +
-                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam.mel.ipgn.com.au;' +
+                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
                     'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au' },
 
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.

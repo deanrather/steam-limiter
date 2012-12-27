@@ -902,7 +902,14 @@ FARPROC ApiHook :: makeThunk (unsigned char * data, size_t bytes) {
  * ecosystem where the initial two-byte NOP isn't present (e.g. inet_addr) and
  * so some form of thunk-based redirection can be needed.
  *
- * For the inet_addr case the 5 bytes of regular NOP space is still there, and
+ * For the inet_addr case the 5 bytes of regular NOP space is still there to
+ * hold a JMP thunk, just the initial MOV EDI, EDI NOP isn't there so when I
+ * write in the short-form JMP -5 I have to copy the initial instruction to
+ * an indirect thunk.
+ *
+ * Worse, there is a lame piece of firewall code that already squats on the
+ * basic Windows hook system in at least one user's system. That needs more
+ * than the first two instructions in the source to be preserved.
  */
 
 bool ApiHook :: attach (void * address, FARPROC hook) {

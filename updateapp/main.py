@@ -249,6 +249,9 @@ isps = {
     # It's hard to tell whether Westnet's netblock really should be merged into
     # the iiNet one or not, but I'm keeping that separate for now.
 
+    # Telstra's GameArena servers seem to be classic Filtered servers with no
+    # visible HTTP support.
+
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
           'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
 
@@ -269,17 +272,23 @@ isps = {
     # Update: According to an iiNet rep, the iiNet list is currently shorter
     # than the full Internode one.
     # http://forums.whirlpool.net.au/forum-replies.cfm?t=1888406#r33536585
+    #
+    # Since Internode has the WAIX servers unmetered I'll include that in the
+    # HTTP rotation, but under the alternate name steam.ix.asn.au I'll set it
+    # as a redirect for iiNet for now.
 
     11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,' +
                     'steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,' +
                     'steam-wa.3fl.net.au,steam-nsw.3fl.net.au,ga17.gamearena.com.au,' +
                     'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net' },
+                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,steam.waia.asn.au' },
+
     12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +
                     'steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net' },
+                    'content?.steampowered.com=steam.cdn.on.net;' +
+                    'steam.ix.asn.au=steam.cdn.on.net' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
     # these server selections are intended more for download performance than
@@ -291,18 +300,26 @@ isps = {
     # The hard bit about this is that performance depends on load, and so the
     # server selections that work well most of the time may end up being less
     # than optimal during load spikes such as Steam sales.
+    #
+    # Whether I should try and shoot down steam.ix.asn.au here via DNS is not
+    # clear, but for safety I will try valve.tge2-3.fr4.syd.llnw.net since that
+    # is at least unmetered (at worst it'll 404 due to virtual hosting).
 
     13: { 'name': 'Optus Australia', 'server': '49.143.234.14',
           'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14;' +
-                    'content?.steampowered.com=49.143.234.14,111.119.10.2' },
+                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net;' +
+                    'steam.ix.asn.au=valve.tge2-3.fr4.syd.llnw.net' },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
-    # where iPrimus list their unmetered servers, and suggests this rule:
+    # where iPrimus list their unmetered servers. The set has changed a little
+    # over time but the WAIX servers including what steam forces via steam.ix.asn.au
+    # (actually an alias equivalent to steam.waia.asn.au) are generally in but not
+    # apparently the steam.cdn.on.net ones, at least not yet.
 
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=49.143.234.14,111.119.10.2,steam1.syd7.internode.on.net,' +
-                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,111.119.10.2' },
+          'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam1.syd7.internode.on.net,' +
+                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam.mel.ipgn.com.au;' +
+                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au' },
 
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
     # It remains to be see whether the 23-Mar-2012 change is meant to also
@@ -313,16 +330,18 @@ isps = {
 
     # Adam appear to have a list of servers (unfortunately, not DNS names and also
     # unfortunately, no indication which ones serve HTTP content).
-    # http://www.adam.com.au/unmetered/unmetered_ip_address_list.txt
-    # The following has the actual servers covered by this list; there
-    # are ranges in which the Internode content servers fall, and the
-    # steam.cdn.on.net one is probably the best bet for HTTP based on the
-    # little information that any ISPs provide about this.
+    # http://www.adam.com.au/support/downloads/unmetered_ip_address_list.txt
+    # The on.net Steam servers are also generally claimed as unmetered, but not
+    # the WAIX ones which Valve's CDN will sometimes try and force so that needs
+    # to be redirected to steam.cdn.on.net through DNS to steam.cdn.on.net, as
+    # that fortunately isn't sensitive to the Host: presented (thanks to WP user
+    # networkMe for his immense help in diagnosing all this).
 
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +
                     'steam.cdn.on.net,steam1.syd7.internode.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net' },
+                    'content?.steampowered.com=steam.cdn.on.net;' +
+                    'steam.ix.asn.au=steam.cdn.on.net' },
 
     17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server' },

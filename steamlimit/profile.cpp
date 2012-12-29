@@ -312,8 +312,15 @@ void Profile :: fromRegistry (const Profile * from) {
         const RegKey  & reg = from != 0 ? from->m_reg : m_reg;
 
         if (m_index == g_noTraffic) {
+                /*
+                 * The "No traffic" profile is now specific for Steam download
+                 * traffic; nobbling the /depot/ URL prefix will stop the HTTP
+                 * download system in its tracks regardless of what hosts are
+                 * used.
+                 */
+
                 clean ();
-                m_filter = wcsdup (L"*:*=");
+                m_filter = wcsdup (L"*:27030=;/depot/*=");
                 return;
         }
 

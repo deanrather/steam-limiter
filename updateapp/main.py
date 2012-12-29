@@ -109,6 +109,8 @@ def stringip_to_number (text):
 
 ipv6_prefixes = {
     "2001:4400:": 0,    # TelstraClear New Zealand
+    "2001:4478:": 12,   # iiNet Australia
+    "2001:4479:": 12,   # iiNet Australia
     "2001:44B8:": 11,   # Internode Australia
     "2406:E000:": 2	# Snap! New Zealand
 };
@@ -303,23 +305,29 @@ isps = {
     #
     # Whether I should try and shoot down steam.ix.asn.au here via DNS is not
     # clear, but for safety I will try valve.tge2-3.fr4.syd.llnw.net since that
-    # is at least unmetered (at worst it'll 404 due to virtual hosting).
+    # is at least unmetered (at worst it'll 404 due to virtual hosting). Since
+    # Optus don't support on.net either, I'll do that same for that.
 
     13: { 'name': 'Optus Australia', 'server': '49.143.234.14',
           'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14;' +
                     'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net;' +
-                    'steam.ix.asn.au=valve.tge2-3.fr4.syd.llnw.net' },
+                    'steam.ix.asn.au=valve.tge2-3.fr4.syd.llnw.net;' +
+                    'steam.cdn.on.net=valve.tge2-3.fr4.syd.llnw.net' },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
     # where iPrimus list their unmetered servers. The set has changed a little
     # over time but the WAIX servers including what steam forces via steam.ix.asn.au
     # (actually an alias equivalent to steam.waia.asn.au) are generally in but not
     # apparently the steam.cdn.on.net ones, at least not yet.
+    #
+    # Give steam.cdn.on.net the same treatment as steam.ix.asn.au gets for
+    # non-WA ISPs, since it's being explicitly advertised as itself now.
 
     14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam1.syd7.internode.on.net,' +
                     'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au' },
+                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au;' +
+                    'steam.cdn.on.net=steam.waia.asn.au' },
 
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
     # It remains to be see whether the 23-Mar-2012 change is meant to also

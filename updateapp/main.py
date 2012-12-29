@@ -332,9 +332,14 @@ isps = {
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
     # It remains to be see whether the 23-Mar-2012 change is meant to also
     # include WestNet or not.
+    #
+    # Update: http://myhelp.westnet.com.au/node/1330 says iiNet/3FL/Internode
+    # is unmetered.
 
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au' },
+          'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au,steam.cdn.on.net,' +
+                    'steam.waia.asn.au,steam01.vic.ix.asn.au;' +
+                    'content?.steampowered.com=steam.cdn.on.net,steam.waia.asn.au' },
 
     # Adam appear to have a list of servers (unfortunately, not DNS names and also
     # unfortunately, no indication which ones serve HTTP content).

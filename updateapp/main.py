@@ -332,14 +332,15 @@ isps = {
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam1.syd7.internode.on.net,' +
                     'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
                     'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au;' +
-                    'steam.cdn.on.net=steam.waia.asn.au' },
+                    'steam.cdn.on.net=valve.tge2-3.fr4.syd.llnw.net' },
 
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
     # It remains to be see whether the 23-Mar-2012 change is meant to also
     # include WestNet or not.
     #
     # Update: http://myhelp.westnet.com.au/node/1330 says iiNet/3FL/Internode
-    # is unmetered.
+    # is unmetered. I'll assume steam.ix.asn.au is as well for now unless I
+    # hear otherwise.
 
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
           'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au,steam.cdn.on.net,' +

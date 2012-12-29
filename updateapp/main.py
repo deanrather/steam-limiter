@@ -278,13 +278,18 @@ isps = {
     # Since Internode has the WAIX servers unmetered I'll include that in the
     # HTTP rotation, but under the alternate name steam.ix.asn.au I'll set it
     # as a redirect for iiNet for now.
+    #
+    # Per http://forums.whirlpool.net.au/forum-replies.cfm?t=2029894 I'm just
+    # temporarily disabling steam.ix.asn.au here, but it's meant to be
+    # unmetered here and once Internode fix that I might edit it back.
 
     11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
           'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,' +
                     'steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,' +
                     'steam-wa.3fl.net.au,steam-nsw.3fl.net.au,ga17.gamearena.com.au,' +
                     'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,steam.waia.asn.au' },
+                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,steam.waia.asn.au;' +
+                    'steam.ix.asn.au=steam.cdn.on.net' },
 
     12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
           'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +

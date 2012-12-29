@@ -28,6 +28,7 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
       </Command>
     </CustomBuild>
+    <None Include="..\LICENSE.txt" />
     <None Include="..\updateapp\app.yaml" />
     <None Include="..\updateapp\base.css" />
     <None Include="..\updateapp\default_error.html" />

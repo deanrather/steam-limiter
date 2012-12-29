@@ -32,7 +32,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if     _MSC_VER >= 1700
 #include "..\nolocale.h"
+#endif
 
 #include <winsock2.h>
 #include <ws2tcpip.h>

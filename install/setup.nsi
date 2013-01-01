@@ -2,7 +2,7 @@
 !include UAC.nsh
 
 !ifndef OutDir
-!define OutDir	"..\vs2010\release"
+!define OutDir "..\vs2010\release"
 !endif
 
 /*
@@ -125,15 +125,16 @@ Section
   StrCpy $SETTINGS "Software\SteamLimiter"
 
   IfFileExists $INSTDIR\steamlimit.exe 0 freshInstall
-    !insertmacro UAC_AsUser_Call Function quitProgram ${UAC_SYNCINSTDIR}
-    goto upgrade
+
+  !insertmacro UAC_AsUser_Call Function quitProgram ${UAC_SYNCINSTDIR}
+  goto upgrade
 
 freshInstall:
   /*
    * By default, run at login. Since our app is so tiny, this is hardly
    * intrusive and undoing it is a simple context-menu item.
-	 *
-	 * If upgrading, all this should still be in place so we leave it alone.
+   *
+   * If upgrading, all this should still be in place so we leave it alone.
    */
 
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SteamLimiter" \
@@ -163,6 +164,7 @@ upgrade:
 
   FILE ${OutDir}\probe.exe
   File ..\scripts\setfilter.js
+  File ..\install\serverlist_generic.reg
   File ${OutDir}\steamlimit.exe
   File ${OutDir}\steamfilter.dll
 
@@ -186,6 +188,19 @@ upgrade:
                    "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
   WriteRegStr HKCU $SETTINGS "NextVersion" \
                    "${VER_MAJOR}.${VER_MINOR}.${VER_BUILD}.${VER_REV}"
+
+  /*
+   * There's a whole system for replacing HTTP documents designed for v0.5.6,
+   * and for now I'm usually getting the replacement content from the registry.
+   * The ideal format for that is REG_MULTI_SZ but NSIS is awful at that, so I
+   * could include a .REG file and exec "REG IMPORT" to install it (which looks
+   * nice except that the REG_MULTI_SZ export format is hex) or I can use a
+   * REG_SZ format string instead. Since NSIS's string quoting is so awful the
+   * REG_SZ isn't really maintainable, so REG it is.
+   */
+
+  DetailPrint 'Execute: reg import $\"$INSTDIR\serverlist_generic.reg$\"'
+  nsExec::ExecToLog 'reg import "$INSTDIR\serverlist_generic.reg"'
 
   /*
    * See if there's a 0.3.0 filter setting inside HKLM - if so, move it to the
@@ -242,7 +257,7 @@ notSnap:
   /*
    * Stick with the custom profile.
    */
-	 
+
   WriteRegStr HKCU "$SETTINGS\C" "Country" "AU"
   WriteRegStr HKCU "$SETTINGS\C" "ISP" "Unknown"
   WriteRegDWORD HKCU $SETTINGS "Profile" 3
@@ -282,13 +297,13 @@ finishInstall:
 
   DeleteRegKey HKLM $SETTINGS
   DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
-	
-	/*
-	 * Remove pre-v0.5 settings that were moved to profile options.
-	 */
+ 
+  /*
+   * Remove pre-v0.5 settings that were moved to profile options.
+   */
 
-	DeleteRegValue HKCU $SETTINGS "Server"
-	DeleteRegValue HKCU $SETTINGS "ISP"
+  DeleteRegValue HKCU $SETTINGS "Server"
+  DeleteRegValue HKCU $SETTINGS "ISP"
 
   !insertmacro UAC_AsUser_Call Function runProgram ${UAC_SYNCINSTDIR}
 SectionEnd
@@ -304,6 +319,8 @@ Section "Uninstall"
 
   Sleep 20
 
+  Delete $INSTDIR\serverlist_generic.reg
+  Delete $INSTDIR\setfilter.js
   Delete $INSTDIR\uninst.exe
   Delete $INSTDIR\probe.exe
   Delete $INSTDIR\steamlimit.exe

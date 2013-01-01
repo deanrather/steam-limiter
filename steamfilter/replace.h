@@ -1,14 +1,15 @@
-#ifndef GLOB_H
-#define GLOB_H                  1
+#ifndef REPLACE_H
+#define REPLACE_H               1
 
 /**@addtogroup Filter Steam limiter filter hook DLL.
  * @{@file
  *
- * Declare prototype for a simple UNIX glob-matching routine.
+ * This declares the structures and functions for replacing a document in a
+ * client application's stream of HTTP requests.
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
  *
- * Copyright (C) 2011-2012 Nigel Bree; All Rights Reserved.
+ * Copyright (C) 2013 Nigel Bree; All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,7 +35,24 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-bool globMatch (const char * example, const wchar_t * pattern);
+struct Replacement;
+
+#include <winsock2.h>
+
+typedef void          * ReplaceHKEY;
+
+void            g_initReplacement (ReplaceHKEY key, const wchar_t * regPath);
+void            g_unloadReplacement (void);
+
+void            g_addEventHandle (SOCKET handle, WSAEVENT event);
+void            g_removeTracking (SOCKET handle);
+
+void            g_replacementCache (const wchar_t * name);
+bool            g_addReplacement (SOCKET handle, const char * name,
+                                  const char * url);
+Replacement   * g_findReplacement (SOCKET handle);
+bool            g_consumeReplacement (Replacement * item, unsigned long length,
+                                      void * buf, unsigned long * copied);
 
 /**@}*/
-#endif  /* ! defined (GLOB_H) */
+#endif  /*! defined (REPLACE_H) */

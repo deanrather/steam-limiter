@@ -6,8 +6,8 @@
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
  *
- * Copyright (C) 2011 Nigel Bree; All Rights Reserved.
- * 
+ * Copyright (C) 2011-2012 Nigel Bree; All Rights Reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -129,6 +129,8 @@ unsigned long   g_profileId;
 
 /**
  * General limiter settings registry paths.
+ *
+ * @{
  */
 
 #define LIMIT_SETTINGS  L"Software\\" RUN_VALUE
@@ -136,6 +138,10 @@ unsigned long   g_profileId;
 #define VERSION_VALUE   L"NextVersion"
 #define TIMESTAMP_VALUE L"UpgradeCheck"
 #define PROFILE_VALUE   L"Profile"
+
+#define REPLACE_SETTINGS        LIMIT_SETTINGS L"\\Replace"
+
+/**@}*/
 
 /**
  * The application's setting root key.
@@ -283,7 +289,17 @@ static  wchar_t         className [] = { L"USurface" };
 
         if (attach && processId == g_steamProcess)
                 return;
-        if (! attach && g_steamProcess == 0)
+
+        /*
+         * Don't load the unload routine repeatedly if we're disabled; do it
+         * at most once until we have a successful load; we want to try an
+         * unload speculatively in case there's a stale filter DLL attached
+         * the first time we try, but otherwise there's no point.
+         */
+
+static  unsigned long   unloadCount;
+
+        if (g_filterDisabled && unloadCount > 0)
                 return;
 
         /*
@@ -294,6 +310,7 @@ static  wchar_t         className [] = { L"USurface" };
         if (! attach || g_filterDisabled) {
                 callFilterId (processId, "FilterUnload");
                 g_steamProcess = 0;
+                ++ unloadCount;
                 return;
         }
 
@@ -302,7 +319,10 @@ static  wchar_t         className [] = { L"USurface" };
 
         Profile         current (g_profileId, & g_settings);
 
-        if (! callFilterId (processId, "SteamFilter", current.filter ()))
+        unloadCount = 0;
+
+        if (! callFilterId (processId, "SteamFilter", current.filter (),
+                            HKEY_CURRENT_USER, REPLACE_SETTINGS))
                 return;
 
         /*

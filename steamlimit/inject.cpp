@@ -5,7 +5,9 @@
  * process.
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
- * 
+ *
+ * Copyright (C) 2011-2012 Nigel Bree; All Rights Reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -32,15 +34,19 @@
 
 #define WIN32_LEAN_AND_MEAN     1
 #include <windows.h>
+#include <winternl.h>
 #include <stddef.h>
 #include "inject.h"
 
 /**
  * Simple cliches for measuring arrays.
+ * @{
  */
 
 #define ARRAY_LENGTH(a)         (sizeof (a) / sizeof (* a))
 #define ARRAY_END(a)            ((a) + ARRAY_LENGTH (a))
+
+/**@}*/
 
 /**
  * Code array containing the initial shim we'll use to bootstrap in our filter
@@ -84,6 +90,9 @@ inline unsigned char * writePointer (void * dest, void * ptr) {
  */
 
 unsigned char * writeString (unsigned char * dest, const wchar_t * src) {
+        if (src == 0)
+                src = L"";
+
         unsigned long   length = (wcslen (src) + 1) * sizeof (wchar_t);
         memcpy (dest, src, length);
         return dest + length;
@@ -94,9 +103,54 @@ unsigned char * writeString (unsigned char * dest, const wchar_t * src) {
  */
 
 unsigned char * writeString (unsigned char * dest, const char * src) {
+        if (src == 0)
+                src = "";
+
         unsigned long   length = strlen (src) + 1;
         memcpy (dest, src, length);
         return dest + length;
+}
+
+/**
+ * Helper for GetProcAddress ().
+ *
+ * A serious problem with GetProcAddress () in Win7 and friends is that some
+ * code outside my application can trigger APPHELP.DLL to load, and that's just
+ * awful because it hooks vast swathes of the Win32 API for itself. This means
+ * that via IAT patching it becomes the source of GetProcAddress () and sets
+ * itself as the target of GetProcAddress.
+ *
+ * That's bad, because we want to know the address of the Kernel32 version of
+ * GetProcAddress () specifically. To get that for real, we need the NTDLL
+ * provider LdrGetProcedureAddress () to evade the shim engine.
+ */
+
+FARPROC SafeGetProcAddress (HMODULE module, const char * name) {
+typedef unsigned long (WINAPI * LGPA) (void * base,
+                                       ANSI_STRING * name,
+                                       unsigned long ordinal,
+                                       void ** result);
+
+static  LGPA            lgpa;
+static  HMODULE         ntdll;
+
+        if (ntdll == 0) {
+                ntdll = GetModuleHandleW (L"NTDLL.DLL");
+                lgpa = (LGPA) GetProcAddress (ntdll, "LdrGetProcedureAddress");
+        }
+
+        ANSI_STRING     proc;
+        proc.Length = strlen (name);
+        proc.MaximumLength = proc.Length + 1;
+        proc.Buffer = (PCHAR) name;
+
+        void          * result;
+        NTSTATUS        status;
+        status = (* lgpa) (module, & proc, 0, & result);
+        if (status != 0)
+                return 0;
+
+        return (FARPROC) result;
 }
 
 /**
@@ -211,7 +265,9 @@ unsigned char * writeString (unsigned char * dest, const char * src) {
 
 unsigned long injectFilter (HANDLE steam, unsigned char * mem,
                             const wchar_t * path, const char * entryName,
-                            const wchar_t * paramString = 0) {
+                            const wchar_t * paramString = 0,
+                            void * regRoot = 0, const wchar_t * regPath = 0,
+                            const wchar_t * curDir = 0) {
         /*
          * The first two entries in the codeBytes will be the addresses of the
          * LoadLibrary and GetProcAddress functions which will bootstrap in our
@@ -250,6 +306,10 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
                 HMODULE         loadedLibrary;
                 unsigned char * entryName;
                 unsigned char * entryPoint;
+
+                void          * regRoot;
+                wchar_t       * regPath;
+                wchar_t       * curDir;
         };
 
         ParamBlock    * params = (ParamBlock *) codeBytes;
@@ -262,10 +322,10 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
 
         memset (params, 0, sizeof (codeBytes));
 
-        params->loadLib = GetProcAddress (kernel, "LoadLibraryW");
-        params->gmh = GetProcAddress (kernel, "GetModuleHandleW");
-        params->gpa = GetProcAddress (kernel, "GetProcAddress");
-        params->freeLib = GetProcAddress (kernel, "FreeLibrary");
+        params->loadLib = SafeGetProcAddress (kernel, "LoadLibraryW");
+        params->gmh = SafeGetProcAddress (kernel, "GetModuleHandleW");
+        params->gpa = SafeGetProcAddress (kernel, "GetProcAddress");
+        params->freeLib = SafeGetProcAddress (kernel, "FreeLibrary");
 
         /*
          * Write the parameter string, and then backpatch a pointer to it
@@ -294,6 +354,29 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
         bool            getModule = wcschr (path, L'\\') == 0;
         dest = writeString (start = dest, path);
         writePointer (& params->path, mem + (start - codeBytes));
+
+        /*
+         * Write the extra context parameter; a registry path and the current
+         * directly of the injecting process.
+         */
+
+        params->regRoot = regRoot;
+
+        if (regPath == 0) {
+                params->regPath = 0;
+        } else {
+                dest = writeString (start = dest, regPath);
+                writePointer (& params->regPath, mem + (start - codeBytes));
+        }
+
+        wchar_t         tempDir [128];
+        if (curDir == 0 &&
+            GetCurrentDirectoryW (ARRAY_LENGTH (tempDir), tempDir) > 0) {
+                curDir = tempDir;
+        }
+
+        dest = writeString (start = dest, curDir);
+        writePointer (& params->curDir, mem + (start - codeBytes));
 
         /*
          * Now write out the name of the entry point we want to use; this is
@@ -352,7 +435,8 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
 
                 /*
                  * if (myFunc != 0)
-                 *   (* myFunc) (param, & result, & resultSize);
+                 *   (* myFunc) (param, & result, & resultSize,
+                 *               regRoot, regPath, curDir);
                  *
                  * Note that we guard this by saving ESP in EBP so we're robust if the
                  * calling convention or parameter count don't match. The function is
@@ -361,6 +445,11 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
                  */
 
                 MOV_EBP_ESP (dest);
+
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, curDir));
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, regPath));
+                PUSH_ESI_AT (dest, offsetof (ParamBlock, regRoot));
+
                 LEA_EBX_ESI_AT (dest, offsetof (ParamBlock, resultSize));
                 * dest ++ = PUSH_EBX;
                 PUSH_ESI_AT (dest, offsetof (ParamBlock, result));
@@ -455,7 +544,9 @@ unsigned long injectFilter (HANDLE steam, unsigned char * mem,
  */
 
 unsigned long callFilter (HANDLE steam, const wchar_t * path,
-                          const char * entryPoint, const wchar_t * param = 0) {
+                          const char * entryPoint, const wchar_t * param = 0,
+                          void * regRoot = 0, const wchar_t * regPath = 0,
+                          const wchar_t * curDir = 0) {
         /*
          * Allocate a page of VM inside the target process.
          *
@@ -477,7 +568,7 @@ unsigned long callFilter (HANDLE steam, const wchar_t * path,
 
         for (;;) {
                 result = injectFilter (steam, (unsigned char *) mem, path, entryPoint,
-                                       param);
+                                       param, regRoot, regPath, curDir);
 
                 if (result != ~ 0UL || tries < 2)
                         break;
@@ -517,7 +608,8 @@ unsigned long callFilter (HANDLE steam, const wchar_t * path,
  */
 
 bool callFilterId (unsigned long processId, const char * entryPoint,
-                   const wchar_t * param) {
+                   const wchar_t * param, void * regRoot,
+                   const wchar_t * regPath, const wchar_t * curDir) {
         /*
          * Form a full path name to our shim DLL based on our own executable
          * file name.
@@ -565,7 +657,8 @@ bool callFilterId (unsigned long processId, const char * entryPoint,
          */
 
         unsigned long   result;
-        result = callFilter (proc, path, entryPoint, param);
+        result = callFilter (proc, path, entryPoint, param,
+                             regRoot, regPath, curDir);
 
         CloseHandle (proc);
 

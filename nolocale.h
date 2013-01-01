@@ -5,8 +5,8 @@
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
  *
- * Copyright (C) 2011 Nigel Bree; All Rights Reserved.
- * 
+ * Copyright (C) 2011-2012 Nigel Bree; All Rights Reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:

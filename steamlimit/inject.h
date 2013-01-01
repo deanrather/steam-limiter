@@ -8,6 +8,8 @@
  * process.
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
+ *
+ * Copyright (C) 2011-2012 Nigel Bree; All Rights Reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,7 +47,8 @@ extern  wchar_t       * g_appPath;
  */
 
 bool callFilterId (unsigned long processId, const char * entryPoint,
-                   const wchar_t * param = 0);
+                   const wchar_t * param = 0, void * regRoot = 0,
+                   const wchar_t * regPath = 0, const wchar_t * curDir = 0);
 
 /**@}*/
 #endif  /* ! defined (INJECT_H) */

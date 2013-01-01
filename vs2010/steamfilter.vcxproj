@@ -65,11 +65,13 @@
       <AssemblerOutput Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AssemblyAndSourceCode</AssemblerOutput>
     </ClCompile>
     <ClCompile Include="..\steamfilter\glob.cpp" />
+    <ClCompile Include="..\steamfilter\replace.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\nolocale.h" />
     <ClInclude Include="..\steamfilter\filterrule.h" />
     <ClInclude Include="..\steamfilter\glob.h" />
+    <ClInclude Include="..\steamfilter\replace.h" />
     <ClInclude Include="..\steamfilter\resource.h" />
   </ItemGroup>
   <ItemGroup>

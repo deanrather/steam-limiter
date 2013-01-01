@@ -6,7 +6,7 @@
  *
  * @author Nigel Bree <nigel.bree@gmail.com>
  *
- * Copyright (C) 2011 Nigel Bree; All Rights Reserved.
+ * Copyright (C) 2011-2013 Nigel Bree; All Rights Reserved.
  * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,6 +46,7 @@
 
 #include "glob.h"
 #include "filterrule.h"
+#include "replace.h"
 
 /**
  * For declaring exported callable functions from the injection shim.
@@ -79,26 +80,20 @@ typedef int (WSAAPI * ConnectFunc) (SOCKET s, const sockaddr * name, int namelen
 typedef struct hostent * (WSAAPI * GetHostFunc) (const char * name);
 
 /**
- * The prototype of the legacy sockets inet_addr () function.
- */
-
-typedef unsigned long (WSAAPI * inet_addr_func) (const char * addr);
-
-/**
- * The prototype of the legacy sockets recv () function.
+ * Prototype of the legacy sockets recv () function.
  */
 
 typedef int   (WSAAPI * RecvFunc) (SOCKET s, char * buf, int len, int flags);
 
 /**
- * The prototype of the legacy sockets recvfrom () function.
+ * Prototype of the legacy sockets recvfrom () function.
  */
 
 typedef int   (WSAAPI * RecvFromFunc) (SOCKET s, char * buf, int len, int flags,
                                        sockaddr * from, int * fromLen);
 
 /**
- * The prototype of the modern asynchronous WSARecv () function.
+ * Prototype of the modern asynchronous WSARecv () function.
  */
 
 typedef int   (WSAAPI * WSARecvFunc) (SOCKET s, LPWSABUF buffers,
@@ -114,7 +109,7 @@ typedef int   (WSAAPI * WSARecvFunc) (SOCKET s, LPWSABUF buffers,
 typedef int   (WSAAPI * SendFunc) (SOCKET s, const char * buf, int len, int flags);
 
 /*
- * The prototype of the modern asynchronous WSASend () function. 
+ * Prototype of the modern asynchronous WSASend () function. 
  */
 
 typedef int   (WSAAPI * WSASendFunc) (SOCKET s, LPWSABUF buffers,
@@ -124,8 +119,7 @@ typedef int   (WSAAPI * WSASendFunc) (SOCKET s, LPWSABUF buffers,
                                       LPWSAOVERLAPPED_COMPLETION_ROUTINE handler);
 
 /**
- * The prototype of WSAGetOverlappedResult (), used with WSASend () and
- * WSARecv ().
+ * Prototype of WSAGetOverlappedResult (), used with WSASend () and WSARecv ().
  */
 
 typedef BOOL  (WSAAPI * WSAGetOverlappedFunc) (SOCKET s, OVERLAPPED * overlapped,
@@ -133,10 +127,64 @@ typedef BOOL  (WSAAPI * WSAGetOverlappedFunc) (SOCKET s, OVERLAPPED * overlapped
                                                unsigned long * flags);
 
 /**
+ * Prototype of the classic sockets select () function.
+ *
+ * This is a horribly obsolete approach; select () was bad API design for the
+ * 80's and "modern" equivalents like epoll () are hardly an improvement (that
+ * being on the few things that Dennis Ritchie's otherwise magisterial STREAMS
+ * design didn't fix, poll () as the user-level interface to events in SVR4 not
+ * being a good design; it took POSIX.4 and real-time signals to make any kind
+ * of worthwhile AIO possible in UNIX and no vendor other than Sun bothered to
+ * do a fully capable implementation).
+ *
+ * Stunningly, there is actually a piece of good design in Linux with respect
+ * to AIO, which is signalfd (2). Unfortunately it's not available elsewhere
+ * and even in Linux it doesn't work at all with sockets. However, it's the
+ * closest thing to the UNIX philosophy and although the Sun people wisely used
+ * Completion Ports from Windows as their model, signalfd () is probably the
+ * single best idea out there (even better than BSD kqueues given how basic and
+ * universally useful working AIO is to applications).
+ *
+ * For whatever reason, the HTTP code in Steam uses this instead of any of the
+ * high-performance systems in Windows.
+ */
+
+typedef int   (WSAAPI * selectFunc) (int count, fd_set * read, fd_set * write,
+                                     fd_set * error,
+                                     const struct timeval * timeout);
+
+/**
+ * Prototype of WSAEventSelect () used with WSAEnumNetworkEvents ().
+ *
+ * This is something that needs to implement state-tracking for sockets to be
+ * useful to wrap; the point in wrapping it is to be able to generate synthetic
+ * read events, because otherwise if we want to emulate something on the read
+ * side the calling application will generally be waiting on the event handle
+ * before attempting to call WSARecv () due to the generally poor structure of
+ * the eventing system in sockets as compared to true AIO as in Windows.
+ */
+
+typedef int   (WSAAPI * WSAEventSelectFunc) (SOCKET s, WSAEVENT event,
+                                             long mask);
+
+/**
+ * Prototype of WSAEnumNetworkEvents (), used to detect socket status.
+ */
+
+typedef int   (WSAAPI * WSAEnumNetworkEventsFunc) (SOCKET s, WSAEVENT event,
+                                                   WSANETWORKEVENTS * events);
+
+/**
  * Prototype for getpeername (), which we don't hook but do want to call.
  */
 
 typedef int   (WSAAPI * getpeernameFunc) (SOCKET s, sockaddr * addr, int * length);
+
+/**
+ * Prototype for closesocket (), to detect when to release tracking data.
+ */
+
+typedef int   (WSAAPI * closesocketFunc) (SOCKET s);
 
 /**
  * Simple equivalent to ntohs.
@@ -197,13 +245,15 @@ struct Hook : public ApiHook {
 
 Hook<ConnectFunc>       g_connectHook;
 Hook<GetHostFunc>       g_gethostHook;
-Hook<inet_addr_func>    g_inet_addr_Hook;
 Hook<RecvFunc>          g_recvHook;
 Hook<RecvFromFunc>      g_recvfromHook;
 Hook<WSARecvFunc>       g_wsaRecvHook;
+Hook<selectFunc>        g_select_Hook;
 Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedHook;
-Hook<SendFunc>          g_sendHook;
+Hook<WSAEventSelectFunc> g_wsaEventSelectHook;
+Hook<WSAEnumNetworkEventsFunc> g_wsaEnumNetworkEventsHook;
 Hook<WSASendFunc>       g_wsaSendHook;
+Hook<closesocketFunc>   g_closesocket_Hook;
 
 getpeernameFunc         g_getpeername;
 
@@ -260,7 +310,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
         /*
          * If no replacement is specified, deny the connection. This isn't used
          * for Steam blocking in most cases because it responds to this by just
-         * trying another server.
+         * trying another server entirely.
          */
 
         if (replace == 0 || replace->sin_addr.S_un.S_addr == INADDR_NONE) {
@@ -446,6 +496,20 @@ Meter           g_meter;
  */
 
 int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
+        Replacement   * replace;
+        replace = g_findReplacement (s);
+        if (replace != 0) {
+                OutputDebugStringA ("Substituting HTTP response\r\n");
+
+                unsigned long   count = 0;
+                bool            ok;
+                ok = g_consumeReplacement (replace, len, buf, & count);
+                unsigned long   result = ok ? ERROR_SUCCESS : WSAEINVAL;
+                SetLastError (result);
+
+                return ok ? count : - 1;
+        }
+
         int             result;
         result = (* g_recvHook) (s, buf, len, flags);
         g_meter += result;
@@ -476,13 +540,48 @@ int WSAAPI recvfromHook (SOCKET s, char * buf, int len, int flags,
  * trying to apply a bandwidth limit).
  */
 
-int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long count,
+int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long bytes,
                         unsigned long * received, unsigned long * flags,
                         OVERLAPPED * overlapped,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
+        Replacement   * replace;
+        replace = g_findReplacement (s);
+        if (replace != 0) {
+                OutputDebugStringA ("Substituting HTTP response\r\n");
+
+                unsigned long   count = 0;
+                bool            ok;
+                ok = g_consumeReplacement (replace, buffers->len, buffers->buf,
+                                           & count);
+                unsigned long   result = ok ? ERROR_SUCCESS : WSAEINVAL;
+                SetLastError (result);
+
+                if (overlapped != 0) {
+                        overlapped->Internal = result;
+                        overlapped->InternalHigh = count;
+
+                        HANDLE          event = overlapped->hEvent;
+                        event = (HANDLE) ((unsigned long) event & ~ 1);
+                        if (event != 0)
+                                SetEvent (event);
+                }
+
+                if (received != 0)
+                        * received = count;
+
+                if (handler != 0)
+                        (* handler) (result, count, overlapped, 0);
+
+                /*
+                 * For now I don't support MSG_PEEK or MSG_WAITALL in the flags.
+                 */
+
+                return result;
+        }
+
         if (overlapped != 0 || handler != 0) {
                 int             result;
-                result = (* g_wsaRecvHook) (s, buffers, count, received, flags,
+                result = (* g_wsaRecvHook) (s, buffers, bytes, received, flags,
                                               overlapped, handler);
 
                 if (result == 0 && overlapped != 0) {
@@ -499,12 +598,112 @@ int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         ignore = flags != 0 && (* flags & MSG_PEEK) != 0;
 
         int             result;
-        result = (* g_wsaRecvHook) (s, buffers, count, received, flags,
-                                      overlapped, handler);
+        result = (* g_wsaRecvHook) (s, buffers, bytes, received, flags,
+                                    overlapped, handler);
         if (result != SOCKET_ERROR && ! ignore)
                 g_meter += * received;
         return result;
 }
+
+/**
+ * Hook for event object registration.
+ */
+
+int WSAAPI wsaEventSelectHook (SOCKET s, WSAEVENT event, long mask) {
+        g_addEventHandle (s, event);
+
+        return (* g_wsaEventSelectHook) (s, event, mask);
+}
+
+/**
+ * Hook for socket close, mainly to handle event deregistration in our tracking
+ * data.
+ */
+
+int WSAAPI closesocket_Hook (SOCKET s) {
+        g_removeTracking (s);
+
+        return (* g_closesocket_Hook) (s);
+}
+
+/**
+ * Hook for event processing.
+ *
+ * Used if we want to simulate input.
+ */
+
+int WSAAPI wsaEnumNetworkEventsHook (SOCKET s, HANDLE event, WSANETWORKEVENTS * events) {
+        int             result;
+        result = (* g_wsaEnumNetworkEventsHook) (s, event, events);
+
+        Replacement   * replace;
+        replace = g_findReplacement (s);
+        if (replace != 0)
+                events->lNetworkEvents |= FD_READ;
+
+        return result;
+}
+
+/**
+ * Hook for event process, obsolete style.
+ *
+ * This is necessary if we want to simulate input events.
+ *
+ * The Windows Sockets version of the fd_set structure isn't a bitmap as in
+ * the classic and hopelessly misdesigned BSD original, thankfully.
+ */
+
+int WSAAPI select_Hook (int count, fd_set * read, fd_set * write,
+                        fd_set * error, const struct timeval * timeout) {
+        /*
+         * Look in the read set to see if there's something there we want to
+         * trigger an event on. If there is, synthesize one immediately and
+         * don't pass on to the inner Win32 implementation at all.
+         */
+
+        fd_set          result [1];
+        FD_ZERO (result);
+
+        int             readCount = read == 0 ? 0 : read->fd_count;
+        int             i;
+        for (i = 0 ; i < readCount ; ++ i) {
+                SOCKET          s = read->fd_array [i];
+                Replacement   * replace = g_findReplacement (s);
+
+                if (replace != 0)
+                        FD_SET (s, result);
+        }
+
+        if (result->fd_count > 0) {
+                if (write != 0)
+                        FD_ZERO (write);
+                if (error != 0)
+                        FD_ZERO (error);
+
+                return result->fd_count;
+        }
+
+        /*
+         * Pass through to the underlying implementation.
+         *
+         * This emulation isn't ideal, since if we're doing a select on one
+         * thread and a second thread creates a condition we'd like to treat as
+         * an emulated read, we don't detect that.
+         *
+         * However, generally applications that are thread-aware don't use any
+         * of the really broken obsolete API design from UNIX sockets such as
+         * select (). In practice, hopefully this limitation won't be a problem
+         * and any properly threaded client application will use something that
+         * is event-based.
+         */
+
+        return (* g_select_Hook) (count, read, write, error, timeout);
+}
+
+/**
+ * Experimental hook for WSAGetOverlapped () in case we find a client doing
+ * high-performance I/O through it.
+ */
 
 BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
                                   unsigned long * length, BOOL wait,
@@ -573,6 +772,11 @@ const char * c_memifind (const char * buf, const char * find, size_t length) {
 
 /**
  * Apply URL filters.
+ *
+ * The return value here is generally one of: length == 0 and result == 0
+ * implies silent success, length > 0 and result == 0 implies an error should
+ * be returned. Other results indicate that the returned buffer should be sent,
+ * whether it's the caller's original or not.
  */
 
 const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
@@ -580,7 +784,7 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
                 return buf;
 
         /*
-         * The Steam client uses upper-case verb text, so we keep things simple.
+         * Match the verb text first, so we can only hook GET and POST.
          */
 
         size_t          verb = 0;
@@ -703,6 +907,25 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
                 return 0;
 
         /*
+         * A pattern starting with < means to provide a substitute reponse on
+         * behalf of the connected server, so we filter the request and a later
+         * receive call has the alternate content supplied.
+         */
+
+        if (replace [0] == '<') {
+                /*
+                 * Set the returned length to 0 if we sucessfully set up a new
+                 * replacement document so that the caller doesn't pass the
+                 * data through.
+                 */
+
+                if (g_addReplacement (s, replace + 1, urlPart))
+                        length = 0;
+                        
+                return 0;
+        }
+
+        /*
          * A pattern of * or /* means pass through.
          *
          * To make this more robust, I'll skip over any leading '/' in the
@@ -759,6 +982,25 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         const char    * buf = buffers [0].buf;
         size_t          len = buffers [0].len;
         buf = filterHttpUrl (s, buf, len);
+
+        if (len == 0) {
+                len = buffers [0].len;
+
+                OutputDebugStringA ("Substituting HTTP request\r\n");
+                if (overlapped != 0) {
+                        overlapped->Internal = ERROR_SUCCESS;
+                        overlapped->InternalHigh = len;
+
+                        HANDLE          event = overlapped->hEvent;
+                        event = (HANDLE) ((unsigned long) event & ~ 1);
+                        if (event != 0)
+                                SetEvent (event);
+                }
+
+                if (sent != 0)
+                        * sent = len;
+                return 0;
+        }
 
         if (buf == 0) {
                 OutputDebugStringA ("Blocking HTTP request\r\n");
@@ -885,7 +1127,15 @@ FARPROC ApiHook :: makeThunk (unsigned char * data, size_t bytes) {
         memcpy (m_thunk, data, bytes);
 
         m_thunk [bytes] = JMP_LONG;
-        writeOffset (m_thunk + bytes + 1, m_thunk - data);
+
+        /*
+         * The offset for the branch is relative to the end of the decoded
+         * branch instruction; it has to go to (data + bytes) to skip over
+         * the things that we've copied to the thunk.
+         */
+
+        unsigned char * addr = m_thunk + bytes;
+        writeOffset (addr + 1, (data + bytes) - (addr + 5));
 
         unsigned long   protect = 0;
         if (! VirtualProtect (m_thunk, sizeof (m_thunk),
@@ -1039,12 +1289,14 @@ void ApiHook :: unhook (void) {
 void unhookAll (void) {
         g_connectHook.unhook ();
         g_gethostHook.unhook ();
-        g_inet_addr_Hook.unhook ();
         g_recvHook.unhook ();
         g_recvfromHook.unhook ();
         g_wsaRecvHook.unhook ();
+        g_select_Hook.unhook ();
+        g_closesocket_Hook.unhook ();
+        g_wsaEventSelectHook.unhook ();
         g_wsaGetOverlappedHook.unhook ();
-        g_sendHook.unhook ();
+        g_wsaEnumNetworkEventsHook.unhook ();
         g_wsaSendHook.unhook ();
 }
 
@@ -1080,7 +1332,8 @@ bool Hook<F> :: attach (F hook, HMODULE lib, const char * name) {
  */
 
 STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
-                            size_t * resultSize) {
+                            size_t * resultSize, HKEY rootKey,
+                            const wchar_t * rootReg, const wchar_t * rootDir) {
         /*
          * If we've already been called, this is a call to re-bind the address
          * being monitored.
@@ -1103,6 +1356,8 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
                 Sleep (1000);
         }
 
+        g_initReplacement (rootKey, rootReg);
+
         setFilter (address);
 
         bool            success;
@@ -1111,8 +1366,15 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
                   g_recvHook.attach (recvHook, ws2, "recv") &&
                   g_recvfromHook.attach (recvfromHook, ws2, "recvfrom") &&
                   g_wsaRecvHook.attach (wsaRecvHook, ws2, "WSARecv") &&
+                  g_select_Hook.attach (select_Hook, ws2, "select") &&
+                  g_closesocket_Hook.attach (closesocket_Hook, ws2,
+                                             "closesocket") && 
+                  g_wsaEventSelectHook.attach (wsaEventSelectHook, ws2,
+                                               "WSAEventSelect") &&
                   g_wsaGetOverlappedHook.attach (wsaGetOverlappedHook,
-                                                   ws2, "WSAGetOverlappedResult") &&
+                                                 ws2, "WSAGetOverlappedResult") &&
+                  g_wsaEnumNetworkEventsHook.attach (wsaEnumNetworkEventsHook,
+                                                     ws2, "WSAEnumNetworkEvents") &&
                   g_wsaSendHook.attach (wsaSendHook, ws2, "WSASend");
 
         g_getpeername = (getpeernameFunc) GetProcAddress (ws2, "getpeername");
@@ -1150,6 +1412,7 @@ void removeHook (void) {
                 return;
 
         unhookAll ();
+        g_unloadReplacement ();
         OutputDebugStringA ("SteamFilter " VER_PRODUCTVERSION_STR " unhooked\n");
 }
 

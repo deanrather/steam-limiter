@@ -34,7 +34,7 @@
 #define VER_MAJOR       0
 #define VER_MINOR       5
 #define VER_BUILD       4
-#define VER_REV         4
+#define VER_REV         5
 
 #define VAL(x)                  #x
 #define STR(x)                  VAL (x)
@@ -52,7 +52,7 @@
 #define VER_COMPANYNAME_STR     "Nigel Bree <nigel.bree@gmail.com>"
 #define VER_WEBSITE_STR         "http://steam-limiter.googlecode.com"
 
-#define VER_COPYRIGHT_STR       "Copyright 2011,12 " VER_COMPANYNAME_STR
+#define VER_COPYRIGHT_STR       "Copyright 2011-2013 " VER_COMPANYNAME_STR
 
 #define VER_FILEVERSION_STR     STR (VER_MAJOR) "." STR (VER_MINOR) "." STR (VER_BUILD) "." STR (VER_REV)
 #define VER_PRODUCTVERSION_STR  VER_FILEVERSION_STR

@@ -24,6 +24,9 @@
     <ClCompile Include="..\steamfilter\glob.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\steamfilter\replace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\nolocale.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\steamfilter\glob.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\steamfilter\replace.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

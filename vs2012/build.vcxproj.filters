@@ -48,6 +48,9 @@
     <None Include="..\updateapp\default_error.html">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="..\install\serverlist_generic.reg">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\limitver.h">

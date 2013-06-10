@@ -55,6 +55,12 @@
 #define STEAMDLL(type)  extern "C" __declspec (dllexport) type __stdcall
 
 /**
+ * Simple cliches for measuring arrays.
+ */
+
+#define ARRAY_LENGTH(a)         (sizeof (a) / sizeof (* a))
+
+/**
  * The prototype of the main function we're hooking is:
  *   int WSAAPI connect (SOCKET s, const struct sockaddr *name, int namelen);
  */
@@ -266,6 +272,35 @@ getpeernameFunc         g_getpeername;
 FilterRules     g_rules (27030);
 
 /**
+ * Special-case passthrough until there's a DNS lookup.
+ *
+ * This seems to be necessary because of Steam Workshop; there's an auth step
+ * in the port 27030 protocol and although it's pretty much useless these days
+ * if this doesn't succeed when Steam first starts it's in a half-offline mode.
+ * This doesn't have any negative effect, *except* it appears for Workshop
+ * games; starting a Steam Workshop game seems to trigger some update process
+ * that fails internally in Steam if it hasn't been able to do a login to a
+ * set of servers on port 27030 at startup.
+ *
+ * So, I disable connect filter rules temporarily on first load until I see a
+ * DNS query issue; since Steam normally does these fairly often this should
+ * not affect the filter normally but it should let Steam do whatever it wants
+ * for a few seconds when it's first loading and this seems to resolve any
+ * quirk it has with Steam Workshop games.
+ *
+ * It's still an ugly hack, but probably the only other approach to deal with
+ * this (unless I find an API that Steam is using to get the initial address
+ * Steam connects to, because it's not gethostbyname - it seems to be something
+ * cached somewhere) would be to get into the business of walking the stack or
+ * inspecting thread IDs to discriminate between this case and downloads. But
+ * in reality that's not going to be particularly robust either, and I don't
+ * want to wander anywhere near the grey area of peeking at the actual Steam
+ * client code with a disassembler to figure out an alternative.
+ */
+
+bool            g_passthrough = true;
+
+/**
  * Hook for the connect () function; check if we want to rework it, or just
  * continue on to the original.
  *
@@ -285,8 +320,11 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
          * thus a module name, to potentially include in the filter string.
          *
          * An alternative to this is to use RtlCaptureStackBacktrace to get the
-         * caller (and potentially more of the stack), but sinec we're x86 only
-         * for now this should do fine.
+         * caller (and potentially more of the stack), but since we're x86 only
+         * for now this should do fine. Doing a stack backtrace along with a
+         * Bloom filter is an interesting way to categorize events and with a
+         * webservice could be pretty robust, but it's more complexity than I
+         * probably want here.
          */
 
         HMODULE         module = 0;
@@ -297,13 +335,27 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
                             (LPCWSTR) addr, & module);
 #endif
 
+        const sockaddr_in * old = (const sockaddr_in *) name;
         sockaddr_in   * replace = 0;
-        if (name->sa_family != AF_INET ||
-            ! g_rules.match ((const sockaddr_in *) name, module, & replace)) {
+        
+        if (g_passthrough || name->sa_family != AF_INET ||
+            ! g_rules.match (old, module, & replace)) {
                 /*
-                 * Just forward on to the original.
+                 * Just forward on to the original. The 'passthrough' case is
+                 * for when Steam starts up and does an auth interchange over
+                 * port 27030 that many ISP-specific Steam servers can't handle
+                 * (specifically the TelstraClear one fails this, which can
+                 * lead Steam Workshop games like Skyrim to not load later on).
+                 *
+                 * So, I temporarily let things pass until I see a DNS query,
+                 * just to handle Steam's strange start-up behaviour. Probably
+                 * going offline and online within Steam will do the same thing
+                 * but restarting the Steam client will be way more common and
+                 * I want the 99% case to work.
                  */
 
+                if (g_passthrough)
+                        OutputDebugStringA ("passthrough\r\n");
                 return (* g_connectHook) (s, name, namelen);
         }
 
@@ -339,7 +391,9 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
 
         char            show [128];
         unsigned char * bytes = & temp.sin_addr.S_un.S_un_b.s_b1;
-        wsprintfA (show, "Connect redirected to %d.%d.%d.%d:%d\r\n",
+        const unsigned char * prev = & old->sin_addr.S_un.S_un_b.s_b1;
+        wsprintfA (show, "Connect redirected %d.%d.%d.%d to %d.%d.%d.%d:%d\r\n",
+                   prev [0], prev [1], prev [2], prev [3],
                    bytes [0], bytes [1], bytes [2], bytes [3],
                    ntohs (temp.sin_port));
 
@@ -353,12 +407,18 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
  */
 
 struct hostent * WSAAPI gethostHook (const char * name) {
+
+        /*
+         * Disable the temporary pass-through mode once we see a DNS query.
+         */
+
+        g_passthrough = false;
+
         sockaddr_in   * replace = 0;
-        if (! g_rules.match (name, & replace) ||
-            (replace != 0 && replace->sin_addr.S_un.S_addr == INADDR_ANY)) {
+
+        if (! g_rules.match (name, & replace)) {
                 /*
-                 * If there's no matching rule, or the matching rule is a
-                 * passthrough, then let things slide.
+                 * No matching rule, silently forward onward.
                  */
 
                 return (* g_gethostHook) (name);
@@ -376,20 +436,12 @@ struct hostent * WSAAPI gethostHook (const char * name) {
                  * see what went wrong.
                  */
 
-                OutputDebugStringA ("gethostbyname refused\r\n");
+                char            show [128];
+                wsprintfA (show, "lookup %.50s refused\r\n");
+                OutputDebugStringA (show);
                 SetLastError (WSAHOST_NOT_FOUND);
                 return 0;
         }
-
-#if     0
-        /*
-         * This gets called a *lot* during big downloads, so it's less useful
-         * having it here now, especially since the port 27030 CDN is now very
-         * much deprecated.
-         */
-
-        OutputDebugStringA ("gethostbyname redirected\r\n");
-#endif
 
         /*
          * Replacing a DNS result raises the question of storage, which for
@@ -404,18 +456,41 @@ struct hostent * WSAAPI gethostHook (const char * name) {
          * rather than point at the replacement.
          */
 
-static  hostent         result;
+        hostent       * result = 0;
+        if (replace != 0 && replace->sin_addr.S_un.S_addr == INADDR_ANY) {
+                /*
+                 * If the matching rule is a passthrough, then wrap it but do
+                 * still log the result.
+                 */
+
+                result = (* g_gethostHook) (name);
+        } else {
+static  hostent         storage;
 static  unsigned long   addr;
 static  unsigned long * addrList [2] = { & addr };
 
-        addr = replace->sin_addr.S_un.S_addr;
-        result.h_addrtype = AF_INET;
-        result.h_addr_list = (char **) addrList;
-        result.h_aliases = 0;
-        result.h_length = sizeof (addr);
-        result.h_name = "remapped.local";
+                addr = replace->sin_addr.S_un.S_addr;
+                storage.h_addrtype = AF_INET;
+                storage.h_addr_list = (char **) addrList;
+                storage.h_aliases = 0;
+                storage.h_length = sizeof (addr);
+                storage.h_name = "remapped.local";
+                result = & storage;
+        }
 
-        return & result;
+        char            show [128];
+        if (result == 0) {
+                wsprintfA (show, "lookup %.50s failed\r\n", name);
+                OutputDebugStringA (show);
+                return 0;
+        }
+
+        unsigned char * bytes = (unsigned char *) * result->h_addr_list;
+        wsprintfA (show, "lookup %.50s as %d.%d.%d.%d\r\n",
+                   name, bytes [0], bytes [1], bytes [2], bytes [3]);
+        OutputDebugStringA (show);
+
+        return result;
 }
 
 /**
@@ -1095,15 +1170,17 @@ int setFilter (wchar_t * address) {
         if (result) {
                 /*
                  * For now, always append this black-hole DNS rule to the main
-                 * rule set. Later on this might change but this will do until
-                 * the full situation with the HTTP CDN is revealed.
+                 * rule set, along with a couple of rules to try and manage the
+                 * "CS" type servers out of use.
                  *
                  * Since rules are processed in order, this still allows custom
                  * rules to redirect these DNS lookups to take place, as those
-                 * will take precedence to this catch-all.
+                 * will take precedence to this catch-all; in a rule list, the
+                 * first rule that matches stops further search.
                  */
 
-                g_rules.append (L"content?.steampowered.com=;/initsession/=");
+                g_rules.append (L"content?.steampowered.com=;/initsession/="
+                                L";/serverlist/*=<generic");
         }
 
         return result ? 1 : 0;

@@ -112,6 +112,7 @@ function readFile (file) {
         "AS4854": 12,   /* Netspace Online Systems (Melbourne), now iiNet */
         "AS2764": 12,   /* AAPT, apparently also part of iiNet */
         "AS7718": 12,   /* Grapevine, formerly owned by TransACT now iiNet */
+        "AS18371": 12,  /* Neighborhood Cable, now iiNet */
 
         "AS7474": 13,   /* SingTel Optus */
         "AS4804": 13,   /* Microplex PTY LTD, owned by Singtel Optus */

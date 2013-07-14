@@ -251,11 +251,14 @@ isps = {
     # It's hard to tell whether Westnet's netblock really should be merged into
     # the iiNet one or not, but I'm keeping that separate for now.
 
-    # Telstra's GameArena servers seem to be classic Filtered servers with no
-    # visible HTTP support.
+    # Telstra's GameArena servers used to be be classic Filtered servers with
+    # no visible HTTP support. This has changed as of this announcement:
+    # http://forums.gamearena.com.au/suggestionsfeedback/topic/159928-new-steam-content-system-now-available-on-gamearena
+    # which suggests that the two existing servers are now HTTP unmetered.
 
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
-          'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au' },
+          'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au;' +
+                    'content?.steampowered.com=ga2.gamearena.com.au,ga17.gamearena.com.au' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au

@@ -1204,8 +1204,6 @@ reinitialize:
                         return 0;
                 }
         }
-
-
 }
 
 /**@}*/

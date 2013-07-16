@@ -180,7 +180,12 @@ BEGIN
     AUTOCHECKBOX "&K", IDC_UPDATE, 57, 47, 10, 10, WS_TABSTOP
 
     PUSHBUTTON "&Autodetect", IDC_AUTODETECT, 205, 48, 40, 10, WS_TABSTOP
-    PUSHBUTTON "&Upload", IDC_UPLOAD, 205, 48, 40, 10, WS_TABSTOP
+    /*
+     * Disable the "upload" button since it appears to be confusing to many
+     * people who are expecting it to be "apply", since that's a more common
+     * dialog element in Windows.
+     *   PUSHBUTTON "&Upload", IDC_UPLOAD, 205, 48, 40, 10, WS_TABSTOP
+     */
 END
 
 /////////////////////////////////////////////////////////////////////////////

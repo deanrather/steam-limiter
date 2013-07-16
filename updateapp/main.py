@@ -254,11 +254,14 @@ isps = {
     # Telstra's GameArena servers used to be be classic Filtered servers with
     # no visible HTTP support. This has changed as of this announcement:
     # http://forums.gamearena.com.au/suggestionsfeedback/topic/159928-new-steam-content-system-now-available-on-gamearena
-    # which suggests that the two existing servers are now HTTP unmetered.
+    # in which supposedly 203.39.198.136 is now the only unmetered server
+    # (it's hard to make sense of that thread since there's conflicting
+    # information there and you can't tell who is official Telstra and
+    # who's just some random person).
 
     10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
-          'filter': '*:27030=ga2.gamearena.com.au,ga17.gamearena.com.au;' +
-                    'content?.steampowered.com=ga2.gamearena.com.au,ga17.gamearena.com.au' },
+          'filter': '*:27030=203.39.198.136;' +
+                    'content?.steampowered.com=203.39.198.136' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au

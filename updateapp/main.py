@@ -259,49 +259,33 @@ isps = {
     # information there and you can't tell who is official Telstra and
     # who's just some random person).
 
-    10: { 'name': 'Telstra BigPond Australia', 'server': '203.39.198.167',
+    10: { 'name': 'Telstra BigPond Australia', 'server': '0.0.0.0',
           'filter': '*:27030=203.39.198.136;' +
                     'content?.steampowered.com=203.39.198.136' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au
     #
-    # During 2011 Internode developed some kind of tie-up with iiNet (the
-    # exact nature of which is somewhat obscure), and as of 23-Mar-2012
-    # (thanks to a heads-up from a rule upload) I've found out that the
-    # integration between them has progressed further:
-    # http://www.3fl.net.au/2012/03/23/internode-joins-iinets-freezone/
-    #
-    # It may be better to just fold iiNet into Internode and free up the
-    # slot in the long term, but for now I'll leave the old branding in
-    # place since it doesn't seem like they have completely gone, even
-    # though they have identical rules now.
-    #
-    # Update: According to an iiNet rep, the iiNet list is currently shorter
-    # than the full Internode one.
-    # http://forums.whirlpool.net.au/forum-replies.cfm?t=1888406#r33536585
-    #
-    # Since Internode has the WAIX servers unmetered I'll include that in the
-    # HTTP rotation, but under the alternate name steam.ix.asn.au I'll set it
-    # as a redirect for iiNet for now.
-    #
-    # Per http://forums.whirlpool.net.au/forum-replies.cfm?t=2029894 I'm just
-    # temporarily disabling steam.ix.asn.au here, but it's meant to be
-    # unmetered here and once Internode fix that I might edit it back.
+    # Internode's and iiNet's rules appear to be broken. Supposedly all the
+    # iiNet steam content is on steam.cdn.on.net but that does not appear to
+    # work for me or some Internode customers. The only two servers on the
+    # Internode master list - the only list they provide, there is no list
+    # of just Steam servers -
+    # http://www.internode.on.net/residential/entertainment/unmetered_content/ip_address_list/
+    # that I can confirm *are* steam servers are 49.143.234.14 and
+    # files-oc-syd.games.on.net - those are the only individual IPs on that
+    # list that appear to be steam content servers.  There may be more, but
+    # if so they are just undocumented entries in some of the larger netblocks
+    # listed on that page and I can't scan them all by hand.
 
-    11: { 'name': 'Internode Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,' +
-                    'steam1.syd7.internode.on.net,steam1.adl6.internode.on.net,' +
-                    'steam-wa.3fl.net.au,steam-nsw.3fl.net.au,ga17.gamearena.com.au,' +
-                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.cdn.on.net,steam.waia.asn.au;' +
-                    'steam.ix.asn.au=steam.cdn.on.net' },
+    11: { 'name': 'Internode Australia', 'server': '0.0.0.0',
+          'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
+                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net,' +
+                    'steam.cdn.on.net' },
 
-    12: { 'name': 'iiNet Australia', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +
-                    'steam.cdn.on.net,steam1.syd7.internode.on.net,steam1.adl6.internode.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net;' +
-                    'steam.ix.asn.au=steam.cdn.on.net' },
+    12: { 'name': 'iiNet Australia', 'server': '0.0.0.0',
+          'filter': '*:27030=steam.cdn.on.net;' +
+                    'content?.steampowered.com=steam.cdn.on.net' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
     # these server selections are intended more for download performance than
@@ -319,26 +303,18 @@ isps = {
     # is at least unmetered (at worst it'll 404 due to virtual hosting). Since
     # Optus don't support on.net either, I'll do that same for that.
 
-    13: { 'name': 'Optus Australia', 'server': '49.143.234.14',
-          'filter': '*:27030=valve.tge2-3.fr4.syd.llnw.net,valve.tge-9-1.fr3.sjc3.llnw.net,49.143.234.6,49.143.234.14;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net;' +
-                    'steam.ix.asn.au=valve.tge2-3.fr4.syd.llnw.net;' +
-                    'steam.cdn.on.net=valve.tge2-3.fr4.syd.llnw.net' },
+    13: { 'name': 'Optus Australia', 'server': '0.0.0.0',
+          'filter': '*:27030=49.143.234.6,49.143.234.14;' +
+                    'content?.steampowered.com=49.143.234.6,49.143.234.14'  },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
-    # where iPrimus list their unmetered servers. The set has changed a little
-    # over time but the WAIX servers including what steam forces via steam.ix.asn.au
-    # (actually an alias equivalent to steam.waia.asn.au) are generally in but not
-    # apparently the steam.cdn.on.net ones, at least not yet.
-    #
-    # Give steam.cdn.on.net the same treatment as steam.ix.asn.au gets for
-    # non-WA ISPs, since it's being explicitly advertised as itself now.
+    # where iPrimus list their unmetered servers. That page has now gone and I
+    # have no information on iPrimus now, and as with iiNet and Internode most
+    # of the old Steam servers are now completely gone.
 
-    14: { 'name': 'iPrimus Australia', 'server': '150.101.120.97',
-          'filter': '*:27030=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam1.syd7.internode.on.net,' +
-                    'steam01.qld.ix.asn.au,steam.waia.asn.au,steam01.vic.ix.asn.au,steam.mel.ipgn.com.au;' +
-                    'content?.steampowered.com=49.143.234.14,valve.tge2-3.fr4.syd.llnw.net,steam.waia.asn.au;' +
-                    'steam.cdn.on.net=valve.tge2-3.fr4.syd.llnw.net' },
+    14: { 'name': 'iPrimus Australia', 'server': '0.0.0.0',
+          'filter': '*:27030=49.143.234.14;' +
+                    'content?.steampowered.com=49.143.234.14,steam.cdn.on.net' },
 
     # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
     # It remains to be see whether the 23-Mar-2012 change is meant to also
@@ -348,10 +324,9 @@ isps = {
     # is unmetered. I'll assume steam.ix.asn.au is as well for now unless I
     # hear otherwise.
 
-    15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam-wa.3fl.net.au,steam-nsw.3fl.net.au,steam.cdn.on.net,' +
-                    'steam.waia.asn.au,steam01.vic.ix.asn.au;' +
-                    'content?.steampowered.com=steam.cdn.on.net,steam.waia.asn.au' },
+    15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '0.0.0.0',
+          'filter': '*:27030=49.143.234.14,steam.cdn.on.net;' +
+                    'content?.steampowered.com=steam.cdn.on.net' },
 
     # Adam appear to have a list of servers (unfortunately, not DNS names and also
     # unfortunately, no indication which ones serve HTTP content).
@@ -362,11 +337,9 @@ isps = {
     # that fortunately isn't sensitive to the Host: presented (thanks to WP user
     # networkMe for his immense help in diagnosing all this).
 
-    16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '202.136.99.185',
-          'filter': '*:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au,' +
-                    'steam.cdn.on.net,steam1.syd7.internode.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net;' +
-                    'steam.ix.asn.au=steam.cdn.on.net' },
+    16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '0.0.0.0',
+          'filter': '*:27030=steam.cdn.on.net;' +
+                    'content?.steampowered.com=steam.cdn.on.net' },
 
     17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server' },

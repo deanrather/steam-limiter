@@ -437,7 +437,7 @@ struct hostent * WSAAPI gethostHook (const char * name) {
                  */
 
                 char            show [128];
-                wsprintfA (show, "lookup %.50s refused\r\n");
+                wsprintfA (show, "lookup %.50s refused\r\n", name);
                 OutputDebugStringA (show);
                 SetLastError (WSAHOST_NOT_FOUND);
                 return 0;

@@ -330,6 +330,6 @@ Section "Uninstall"
   DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
   DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LimitSteam"
-  DeleteRegKey HKLM $SETTINGS
-  DeleteRegKey HKCU $SETTINGS
+  DeleteRegKey HKLM "Software\SteamLimiter"
+  DeleteRegKey HKCU "Software\SteamLimiter"
 SectionEnd

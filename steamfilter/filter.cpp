@@ -339,7 +339,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
         sockaddr_in   * replace = 0;
         
         if (g_passthrough || name->sa_family != AF_INET ||
-            ! g_rules.match (old, module, & replace)) {
+            ! g_rules.matchIp (old, module, & replace)) {
                 /*
                  * Just forward on to the original. The 'passthrough' case is
                  * for when Steam starts up and does an auth interchange over
@@ -416,7 +416,7 @@ struct hostent * WSAAPI gethostHook (const char * name) {
 
         sockaddr_in   * replace = 0;
 
-        if (! g_rules.match (name, & replace)) {
+        if (! g_rules.matchDns (name, & replace)) {
                 /*
                  * No matching rule, silently forward onward.
                  */
@@ -846,6 +846,51 @@ const char * c_memifind (const char * buf, const char * find, size_t length) {
 }
 
 /**
+ * Helper for filterHttpUrl () in cases where I want to actually rewrite a URL
+ * (or more likely a host: header), splicing a replacement string over an old
+ * one.
+ *
+ * Take an incoming buffer with a region in the middle to splice and take a
+ * copy with the bit in the middle replaced.
+ */
+
+char * splice (const char * base, const char * from, const char * to,
+               size_t & length, const char * replace, const char * concat = "") {
+        size_t          first = from - base;
+        size_t          subst = strlen (replace);
+        size_t          subst2 = concat == 0 ? 0 : strlen (concat);
+        size_t          rest = base + length - to;
+        size_t          total = first + subst + subst2 + rest;
+        char          * copy = (char *) HeapAlloc (GetProcessHeap (), 0, total + 1);
+
+        char          * out = copy;
+        if (first > 0) {
+                memcpy (out, base, first);
+                out += first;
+        }
+        if (subst > 0) {
+                memcpy (out, replace, subst);
+                out += subst;
+        }
+        if (subst2 > 0) {
+                memcpy (out, concat, subst2);
+                out += subst2;
+        }
+        if (rest > 0) {
+                memcpy (out, to, rest);
+                out += rest;
+        }
+
+        * out = 0;
+
+#if     0
+        OutputDebugStringA (out);
+#endif
+        return copy;
+}
+
+
+/**
  * Apply URL filters.
  *
  * The return value here is generally one of: length == 0 and result == 0
@@ -941,10 +986,30 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
         memcpy (dest, buf, verb);
         dest += verb;
 
+        bool            matchHost = false;
+        const char    * newHost = 0;
+        const char    * hostPart = 0;
+
         if (hostLength > 0) {
-                * dest = '[';
-                memcpy (dest + 1, host, hostLength - 2);
-                dest [hostLength - 1] = ']';
+                /*
+                 * Extract a copy of the host name, originally for the purpose
+                 * of just printing it but now for matching it as well, using
+                 * the '//' sigil at the front of the pattern (similar to how
+                 * the URL patterns use a '/' sigil).
+                 */
+
+                hostPart = dest;
+                dest [1] = dest [0] = '/';
+                memcpy (dest + 2, host, hostLength - 2);
+                dest [hostLength] = 0;
+
+                matchHost = g_rules.matchHost (dest, & newHost);
+
+                /*
+                 * Now format the temp copy for printing and having the request
+                 * URL glued to it.
+                 */
+
                 dest += hostLength;
         }
 
@@ -958,18 +1023,78 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
         * dest = 0;
 
         /*
-         * Now run the match against the URL.
+         * Before we do the URL processing, perform a host replacement if it is
+         * indicated; since that leaves the URL part in the same offset in the
+         * copied buffer, it is easier to replace first before matching the URL.
+         */
+
+        while (matchHost) {
+                /*
+                 * An empty host means block.
+                 */
+
+                if (newHost == 0 || * newHost == 0) {
+                        OutputDebugStringA ("Rejected host\r\n");
+                        return 0;
+                }
+
+                while (* newHost == '/')
+                        ++ newHost;
+
+                /*
+                 * A pattern of '*' means pass through (in this case to the
+                 * URL processing.
+                 */
+
+                if (newHost [0] == '*' && newHost [1] == 0) {
+                        newHost = 0;
+                        break;
+                }
+
+                /*
+                 * Replace the host: part with the replacement string and then
+                 * continue with the URL matching.
+                 */
+
+                buf = splice (buf, host, host + hostLength, length,
+                              newHost, "\r\n");
+
+                OutputDebugStringA ("Replaced host\r\n");
+                break;
+        }
+
+        /*
+         * Now run the match against the URL (in the copy of the URL in the
+         * stack).
          */
 
         const char    * replace = 0;
-        if (! g_rules.match (urlPart, & replace)) {
+        if (! g_rules.matchUrl (urlPart, & replace)) {
+                if (matchHost || hostPart == 0)
+                        return buf;
+
                 /*
-                 * If I wanted, instead of passing through now that I'm getting
-                 * the host data out, I can try a different match against just
-                 * the host part of the string - I'm curious if I might want to
-                 * do this to more firmly nail down the "CS" content server
-                 * type.
+                 * As a final attempt to decide, we can match the host+URL as a
+                 * pair, although here all we do is succeed or fail - don't try
+                 * to handle replacing.
+                 *
+                 * The aim here is to allow a pattern which matches the prefix
+                 * of the URL to have a catch-all pattern for certain URLs that
+                 * applies **if and only if** it hasn't been permitted by an
+                 * earlier positive match.
                  */
+
+                if (! g_rules.matchHost (hostPart, & newHost))
+                        return buf;
+
+                /*
+                 * Pass it or fail it?
+                 */
+
+                if (newHost == 0 || * newHost == 0) {
+                        OutputDebugStringA ("Rejected host+url\r\n");
+                        return 0;
+                }
 
                 return buf;
         }
@@ -978,13 +1103,25 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
          * An empty pattern means block.
          */
 
-        if (replace == 0 || * replace == 0)
+        if (replace == 0 || * replace == 0) {
+                OutputDebugStringA ("Rejected URL\r\n");
                 return 0;
+        }
 
         /*
          * A pattern starting with < means to provide a substitute reponse on
          * behalf of the connected server, so we filter the request and a later
          * receive call has the alternate content supplied.
+         *
+         * In practice this hasn't been as useful as I hoped, because the main
+         * thing I want to replace is the /serverlist document but Steam caches
+         * that excessively (making it hard to enable/disable at will because
+         * of the need to manually restart Steam).
+         *
+         * However, I've also been submarined by an ISP-hosted CDN that is set
+         * up with a virtual host rule that requires its own name rather than
+         * the *.steampowered.com one. This forces me to have to look at rules
+         * to process the hostnames and allow/disable hosts at that level.
          */
 
         if (replace [0] == '<') {
@@ -1021,19 +1158,19 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
          * original data block with our URL in place of the original.
          */
 
+        char          * copy;
+        copy = splice (buf, buf + verb, buf + tempLen, length, replace);
 
-        size_t          subst = strlen (replace);
-        size_t          rest = (buf + length - end);
-        size_t          total = verb + subst + rest;
-        char          * copy = (char *) HeapAlloc (GetProcessHeap (), 0, total + 1);
+        /*
+         * If we already built a temporary request due to replacing the host as
+         * well as replacing the URL, free the buffer for the host copy.
+         */
 
-        memcpy (copy, buf, verb);
-        memcpy (copy + verb, replace, subst);
-        memcpy (copy + verb + subst, end, rest);
-        copy [total] = 0;
+        if (newHost != 0)
+                HeapFree (GetProcessHeap (), 0, (LPVOID) buf);
 
-        OutputDebugStringA (copy);
         return copy;
+
 }
 
 /**
@@ -1078,7 +1215,6 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         }
 
         if (buf == 0) {
-                OutputDebugStringA ("Blocking HTTP request\r\n");
                 SetLastError (WSAECONNRESET);
                 return SOCKET_ERROR;
         }
@@ -1109,6 +1245,7 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
          */
 
         if (overlapped != 0 || handler != 0 || count > 1) {
+                HeapFree (GetProcessHeap (), 0, (LPVOID) buf);
                 SetLastError (WSAEINVAL);
                 return SOCKET_ERROR;
         }
@@ -1117,6 +1254,8 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         int             result;
         unsigned long   actual;
         result = (* g_wsaSendHook) (s, temp, 1, & actual, flags, 0, 0);
+
+        HeapFree (GetProcessHeap (), 0, (LPVOID) buf);
         if (result != 0)
                 return result;
 
@@ -1169,9 +1308,11 @@ int setFilter (wchar_t * address) {
         bool            result = g_rules.install (address);
         if (result) {
                 /*
-                 * For now, always append this black-hole DNS rule to the main
+                 * For now, always append these black-hole rules to the main
                  * rule set, along with a couple of rules to try and manage the
-                 * "CS" type servers out of use.
+                 * "CS" type servers out of use and as well eliminate any
+                 * server listed in a special server list that hasn't already
+                 * been whitelisted.
                  *
                  * Since rules are processed in order, this still allows custom
                  * rules to redirect these DNS lookups to take place, as those
@@ -1179,8 +1320,9 @@ int setFilter (wchar_t * address) {
                  * first rule that matches stops further search.
                  */
 
-                g_rules.append (L"content?.steampowered.com=;/initsession/="
-                                L";/serverlist/*=<generic");
+                g_rules.append (L"//*.steampowered.com=*;"
+                                L"//*/depot/*=;"
+                                L"/initsession/=");
         }
 
         return result ? 1 : 0;

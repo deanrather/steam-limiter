@@ -110,7 +110,8 @@ public:
 static  bool            installFilters (wchar_t * str);
 
         bool            match (const char * example, addrinfo ** replace);
-        bool            match (const char * example, const char ** replace);
+        bool            match (const char * example, const char ** replace,
+                               int slashMode);
 
                         FilterRule ();
                       ~ FilterRule ();
@@ -140,12 +141,14 @@ public:
         bool            append (const wchar_t * rules);
         bool            install (const wchar_t * rules);
 
-        bool            match (const sockaddr_in * name, void * module,
+        bool            matchIp (const sockaddr_in * name, void * module,
                                sockaddr_in ** replace);
-        bool            match (const char * name,
+        bool            matchDns (const char * name,
                                sockaddr_in ** replace);
-        bool            match (const char * name,
-                               const char ** replace);
+        bool            matchUrl (const char * name,
+                                  const char ** replace);
+        bool            matchHost (const char * name,
+                                   const char ** replace);
 };
 
 /**@}*/

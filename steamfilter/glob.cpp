@@ -41,7 +41,8 @@
  * Steam client using gethostbyname ().
  */
 
-bool globMatch (const char * example, const wchar_t * pattern) {
+bool globMatch (const char * example, const wchar_t * pattern,
+                int slashMode) {
         if (example == 0)
                 return false;
 
@@ -78,6 +79,34 @@ bool globMatch (const char * example, const wchar_t * pattern) {
                 }
 
                 /*
+                 * Quickly recognise a trailing '*' as auto-success having got
+                 * this far through the example - this makes sense as long as
+                 * we either don't have a list of delimiter-type characters
+                 * that '*' doesn't match - like '/' in the old UNIX shell,
+                 * although that was more because path structure got parsed out
+                 * of patterns first (and each path level was processed as part
+                 * of directly expansion) - or because even if we do a trailing
+                 * '*' can safely be a special case.
+                 */
+
+                ch = pattern [1];
+                if (ch == 0)
+                        return true;
+
+                /*
+                 * Do for our purposes should a '*' be able to match a '/' or
+                 * not - one way of deciding is by whether there are any '/'
+                 * characters in the rest of the pattern, or we can just say
+                 * any interior '*' doesn't match a '/' but a trailing one does,
+                 * or we can say that we can treat a star-slash combo as
+                 * implying a not-match.
+                 */
+
+                bool            noSlash = slashMode == SLASH_NO_MATCH ? true :
+                                          slashMode == SLASH_MATCH ? false :
+                                          ch == '/' || ch == '.';
+
+                /*
                  * Wildcard match, consume any number of characters. As in the
                  * original UNIX v6 code, this is a fairly inefficient way of
                  * implementing Kleene-type closure compared to any of the more
@@ -89,19 +118,30 @@ bool globMatch (const char * example, const wchar_t * pattern) {
 
                 for (;;) {
                         /*
-                         * Start with a recursive call just on the example, so
-                         * that we permit 0 characters to match.
+                         * Start with a recursive call just on the current
+                         * example.
                          */
 
-                        if (globMatch (example, pattern + 1))
+                        if (globMatch (example, pattern + 1, slashMode))
                                 return true;
 
-                        if (* example == 0)
+                        ch = * example;
+                        if (ch == 0)
+                                return false;
+
+                        /*
+                         * Before consuming a character, if we want to make '/'
+                         * a special case we leave out of a '*' pattern we can
+                         * do it here.
+                         */
+
+                        if (noSlash && ch == '/')
                                 return false;
 
                         ++ example;
                 }
         }
+
         return * example == 0;
 }
 

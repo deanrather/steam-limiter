@@ -34,7 +34,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-bool globMatch (const char * example, const wchar_t * pattern);
+#define SLASH_MAYBE             0
+#define SLASH_MATCH             1
+#define SLASH_NO_MATCH          2
+
+bool globMatch (const char * example, const wchar_t * pattern,
+                int slashMode = SLASH_MAYBE);
 
 /**@}*/
 #endif  /* ! defined (GLOB_H) */

@@ -628,7 +628,7 @@ bool FilterRule :: parseRule (const wchar_t * from, const wchar_t * to) {
  */
 
 bool FilterRule :: match (const char * example, addrinfo ** replace) {
-        if (m_pattern != 0 && ! globMatch (example, m_pattern))
+        if (m_pattern != 0 && ! globMatch (example, m_pattern, SLASH_NO_MATCH))
                 return false;
 
         /*
@@ -650,11 +650,12 @@ bool FilterRule :: match (const char * example, addrinfo ** replace) {
 
 
 /**
- * Match a filter rule based on a URL string.
+ * Match a filter rule based on a URL string or other simple string.
  */
 
-bool FilterRule :: match (const char * example, const char ** replace) {
-        if (m_pattern != 0 && ! globMatch (example, m_pattern))
+bool FilterRule :: match (const char * example, const char ** replace,
+                          int slashMode) {
+        if (m_pattern != 0 && ! globMatch (example, m_pattern, slashMode))
                 return false;
 
         /*
@@ -851,8 +852,8 @@ bool FilterRules :: install (const wchar_t * specs) {
         LeaveCriticalSection (l_filterLock);
 
         /*
-         * Strictly speaking, this is bad since the a piece of matched rule
-         * data can have escaped from a match () function in a thread. Delaying
+         * Strictly speaking, this is bad since a piece of matched rule data
+         * can have escaped from a match () function in a thread. Delaying
          * the actual free for one round would help with that.
          */
 
@@ -906,8 +907,8 @@ bool FilterRules :: append (const wchar_t * specs) {
  * address is quickly rendered as text for matching.
  */
 
-bool FilterRules :: match (const sockaddr_in * name, void * module,
-                           sockaddr_in ** replace) {
+bool FilterRules :: matchIp (const sockaddr_in * name, void * module,
+                             sockaddr_in ** replace) {
         if (! l_initFuncs ())
                 return false;
 
@@ -973,10 +974,10 @@ bool FilterRules :: match (const sockaddr_in * name, void * module,
 }
 
 /**
- * Match the filter rules against a DNS name.
+ * Match the filter rules against a DNS name, returning an IP.
  */
 
-bool FilterRules :: match (const char * name, sockaddr_in ** replace) {
+bool FilterRules :: matchDns (const char * name, sockaddr_in ** replace) {
         if (! l_initFuncs ())
                 return false;
 
@@ -1009,10 +1010,13 @@ bool FilterRules :: match (const char * name, sockaddr_in ** replace) {
 }
 
 /**
- * Match a URL string and return a suitable replacement.
+ * Match a URL string and return a suitable replacement string.
  */
 
-bool FilterRules :: match (const char * name, const char ** replace) {
+bool FilterRules :: matchUrl (const char * name, const char ** replace) {
+        if (name == 0 || * name != '/')
+                return false;
+
         if (! l_initFuncs ())
                 return false;
 
@@ -1026,13 +1030,31 @@ bool FilterRules :: match (const char * name, const char ** replace) {
 
         FilterRule    * test = m_head;
         for (; test != 0 ; test = test->m_next) {
-                if (test->match (name, replace))
+                if (test->match (name, replace, SLASH_MAYBE))
                         break;
         }
 
         LeaveCriticalSection (l_filterLock);
 
         return test != 0;
+}
+
+/**
+ * Match a host name and return a suitable replacement string.
+ *
+ * For now I make this the same as matchUrl () since I'm not keeping all the
+ * rule types in separate lists (since the total size of the rulebase is just
+ * not large enough to warrant it).
+ *
+ * Note that the expectation here is that the incoming name will have '//' as
+ * a sigil at the front to distinguish it lexically from a URL.
+ */
+
+bool FilterRules :: matchHost (const char * name, const char ** replace) {
+        if (name == 0 || * name != '/')
+                return false;
+
+        return matchUrl (name, replace);
 }
 
 /**@}*/

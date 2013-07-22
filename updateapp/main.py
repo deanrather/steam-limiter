@@ -126,7 +126,8 @@ def find_netblock (ip):
     if ip == '127.0.0.1':
         ip = '203.167.129.4'
 
-    if type (ip) == str:
+    ipType = type (ip)
+    if ipType == str or ipType == unicode:
         if ':' in ip:   # look in IPv6 table.
             ip = ip.upper ()
             for prefix in ipv6_prefixes.items ():
@@ -280,12 +281,18 @@ isps = {
 
     11: { 'name': 'Internode Australia', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net,' +
-                    'steam.cdn.on.net' },
+                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+          'allow': '//steam.cdn.on.net=*' },
+
+    # iiNet are now special, because their Steam server (which is behind a
+    # front-end like the Telstra one) returns 403 access errors to me but is
+    # accessible to subscribers, and it appears to want its host: entry to be
+    # itself and rejects the *.steampowered.com domain names flat out.
 
     12: { 'name': 'iiNet Australia', 'server': '0.0.0.0',
           'filter': '*:27030=steam.cdn.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net' },
+                    'content?.steampowered.com=',
+          'allow': '//steam.cdn.on.net=*' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
     # these server selections are intended more for download performance than
@@ -313,20 +320,17 @@ isps = {
     # of the old Steam servers are now completely gone.
 
     14: { 'name': 'iPrimus Australia', 'server': '0.0.0.0',
-          'filter': '*:27030=49.143.234.14;' +
-                    'content?.steampowered.com=49.143.234.14,steam.cdn.on.net' },
+          'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
+                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+          'allow': '//steam.cdn.on.net=*' },
 
-    # Quite how Westnet fit into iiNet (and thus Internode) is hard to guess.
-    # It remains to be see whether the 23-Mar-2012 change is meant to also
-    # include WestNet or not.
-    #
-    # Update: http://myhelp.westnet.com.au/node/1330 says iiNet/3FL/Internode
-    # is unmetered. I'll assume steam.ix.asn.au is as well for now unless I
-    # hear otherwise.
+    # As with iPrimus since many of the old Steam servers listed as unmetered
+    # are now no longer active, try using the current Internode rules
 
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '0.0.0.0',
-          'filter': '*:27030=49.143.234.14,steam.cdn.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net' },
+          'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
+                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+          'allow': '//steam.cdn.on.net=*' },
 
     # Adam appear to have a list of servers (unfortunately, not DNS names and also
     # unfortunately, no indication which ones serve HTTP content).
@@ -338,8 +342,9 @@ isps = {
     # networkMe for his immense help in diagnosing all this).
 
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '0.0.0.0',
-          'filter': '*:27030=steam.cdn.on.net;' +
-                    'content?.steampowered.com=steam.cdn.on.net' },
+          'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
+                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+          'allow': '//steam.cdn.on.net=*' },
 
     17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server' },
@@ -478,7 +483,7 @@ def send (handler, data):
 # from to render
 
 def bundle (self):
-    source = self.request.remote_addr
+    source = self.request.get ('ip', self.request.remote_addr)
     netblock = find_netblock (source)
 
     # GAE actually includes a small amount of GeoIP itself; not what need for
@@ -498,7 +503,8 @@ def bundle (self):
         'country': country,
         'ispname': isp ['name'],
         'filterip': isp ['server'],
-        'filterrule': isp.get ('filter') or isp ['server']
+        'filterrule': isp.get ('filter') or isp ['server'],
+        'allow': isp.get ('allow') or ''
     }
 
     test = isp.get ('test')
@@ -559,6 +565,12 @@ class FilterHandler (webapp2.RequestHandler):
 class FilterRuleHandler (webapp2.RequestHandler):
     def get (self):
         send (self, bundle (self) ['filterrule'])
+
+# Return a customized server list, or the default global one
+
+class AllowHostHandler (webapp2.RequestHandler):
+    def get (self):
+        send (self, bundle (self) ['allow'])
 
 # Return a bundle of various of the above individual pieces as a JSON-style
 # map.
@@ -696,6 +708,7 @@ app = webapp2.WSGIApplication ([('/', MainHandler),
                                 ('/ispname', IspHandler),
                                 ('/filterip', FilterHandler),
                                 ('/filterrule', FilterRuleHandler),
+                                ('/allow', AllowHostHandler),
                                 ('/all', BundleHandler),
                                 ('/feedback', FeedbackHandler),
                                 ('/uploadrule', UploadRuleHandler),

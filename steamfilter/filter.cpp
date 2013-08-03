@@ -266,6 +266,22 @@ getpeernameFunc         g_getpeername;
 /**@}*/
 
 /**
+ * As a safety thing to prevent crashes on unload, set a global counter when
+ * inside a hooked function - particularly the emulation of select (), since
+ * that has a timeout; because of the timeout we could be inside the wrapped
+ * version of the function in one thread while another thread is trying to
+ * unload all the hook functions.
+ */
+
+class InHook {
+public:
+static  LONG            g_hookCount;
+
+                        InHook () { InterlockedIncrement (& g_hookCount); }
+                      ~ InHook () { InterlockedDecrement (& g_hookCount); }
+};
+
+/**
  * This holds all the rules we apply.
  */
 
@@ -303,18 +319,11 @@ bool            g_passthrough = true;
 /**
  * Hook for the connect () function; check if we want to rework it, or just
  * continue on to the original.
- *
- * Mainly our aim was to block port 27030 which is the good Steam 'classic' CDN
- * but Valve have *two* amazingly half-baked and badly designed HTTP download
- * systems as well. One - "CDN" - uses DNS tricks, while the other one - "CS" -
- * is rather more nasty, and almost impossible to filter cleanly out from the
- * legitimate use of HTTP inside Steam - for CS servers only numeric IPs are
- * passed over HTTP and they aren't parsed by API functions we can hook like
- * RtlIpv4AddressToStringEx (which exists in Windows XPSP3 even though it's
- * not documented).
  */
 
 int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
+        InHook          hooking;
+
         /*
          * Capture the caller's return address so we can map it to a module and
          * thus a module name, to potentially include in the filter string.
@@ -356,6 +365,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
 
                 if (g_passthrough)
                         OutputDebugStringA ("passthrough\r\n");
+
                 return (* g_connectHook) (s, name, namelen);
         }
 
@@ -407,6 +417,7 @@ int WSAAPI connectHook (SOCKET s, const sockaddr * name, int namelen) {
  */
 
 struct hostent * WSAAPI gethostHook (const char * name) {
+        InHook          hooking;
 
         /*
          * Disable the temporary pass-through mode once we see a DNS query.
@@ -571,6 +582,8 @@ Meter           g_meter;
  */
 
 int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
+        InHook          hooking;
+
         Replacement   * replace;
         replace = g_findReplacement (s);
         if (replace != 0) {
@@ -593,6 +606,8 @@ int WSAAPI recvHook (SOCKET s, char * buf, int len, int flags) {
 
 int WSAAPI recvfromHook (SOCKET s, char * buf, int len, int flags,
                          sockaddr * from, int * fromLen) {
+        InHook          hooking;
+
         int             result;
         result = (* g_recvfromHook) (s, buf, len, flags, from, fromLen);
         g_meter += result;
@@ -619,6 +634,8 @@ int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long bytes,
                         unsigned long * received, unsigned long * flags,
                         OVERLAPPED * overlapped,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
+        InHook          hooking;
+
         Replacement   * replace;
         replace = g_findReplacement (s);
         if (replace != 0) {
@@ -685,6 +702,8 @@ int WSAAPI wsaRecvHook (SOCKET s, LPWSABUF buffers, unsigned long bytes,
  */
 
 int WSAAPI wsaEventSelectHook (SOCKET s, WSAEVENT event, long mask) {
+        InHook          hooking;
+
         g_addEventHandle (s, event);
 
         return (* g_wsaEventSelectHook) (s, event, mask);
@@ -696,6 +715,8 @@ int WSAAPI wsaEventSelectHook (SOCKET s, WSAEVENT event, long mask) {
  */
 
 int WSAAPI closesocket_Hook (SOCKET s) {
+        InHook          hooking;
+
         g_removeTracking (s);
 
         return (* g_closesocket_Hook) (s);
@@ -708,6 +729,8 @@ int WSAAPI closesocket_Hook (SOCKET s) {
  */
 
 int WSAAPI wsaEnumNetworkEventsHook (SOCKET s, HANDLE event, WSANETWORKEVENTS * events) {
+        InHook          hooking;
+
         int             result;
         result = (* g_wsaEnumNetworkEventsHook) (s, event, events);
 
@@ -730,6 +753,8 @@ int WSAAPI wsaEnumNetworkEventsHook (SOCKET s, HANDLE event, WSANETWORKEVENTS * 
 
 int WSAAPI select_Hook (int count, fd_set * read, fd_set * write,
                         fd_set * error, const struct timeval * timeout) {
+        InHook          hooking;
+
         /*
          * Look in the read set to see if there's something there we want to
          * trigger an event on. If there is, synthesize one immediately and
@@ -783,6 +808,8 @@ int WSAAPI select_Hook (int count, fd_set * read, fd_set * write,
 BOOL WSAAPI wsaGetOverlappedHook (SOCKET s, OVERLAPPED * overlapped,
                                   unsigned long * length, BOOL wait,
                                   unsigned long * flags) {
+        InHook          hooking;
+
         BOOL            result;
         result = (* g_wsaGetOverlappedHook) (s, overlapped, length, wait, flags);
 
@@ -1191,6 +1218,8 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
                         unsigned long * sent, unsigned long flags,
                         OVERLAPPED * overlapped,
                         LPWSAOVERLAPPED_COMPLETION_ROUTINE handler) {
+        InHook          hooking;
+
         const char    * buf = buffers [0].buf;
         size_t          len = buffers [0].len;
         buf = filterHttpUrl (s, buf, len);
@@ -1502,6 +1531,14 @@ void ApiHook :: unhook (void) {
 }
 
 /**
+ * Global counter manipulated by InHook as hook functions are entered to make
+ * loading and unloading safer.
+ */
+
+/* static */
+LONG            InHook :: g_hookCount;
+
+/**
  * Unhook all the hooked functions.
  */
 
@@ -1517,6 +1554,14 @@ void unhookAll (void) {
         g_wsaGetOverlappedHook.unhook ();
         g_wsaEnumNetworkEventsHook.unhook ();
         g_wsaSendHook.unhook ();
+
+        /*
+         * Wait until none of the main application threads are inside any of
+         * the hook routines.
+         */
+
+        while (InHook :: g_hookCount > 0)
+                Sleep (1);
 }
 
 /**

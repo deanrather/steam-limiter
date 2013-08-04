@@ -224,8 +224,15 @@ isps = {
     # filtered so I can't detect whether they support port 80 or not, and none
     # of the ISPs document this properly.
 
+    # TelstraClear have made wlgwpstmcon01.telstraclear.co.nz go away, but the
+    # new name is steam.cdn.vodafone.co.nz which indicates potential progress
+    # to having a proper HTTP server, since the server actually isn't
+    # firewalled any more (that's a recent change). It may be that there is
+    # finally some progress there and I shall see if it requires a host rule
+    # rewrite of the new //steam.cdn.vodafone.co.nz form or not.
+
     0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
-         'filter': '*:27030=wlgwpstmcon01.telstraclear.co.nz' },
+         'filter': '*:27030=steam.cdn.vodafone.co.nz;content*.steampowered.com=steam.cdn.vodafone.co.nz' },
     1: { 'name': 'Orcon New Zealand', 'server': '0.0.0.0',
          'filter': '# Orcon no longer have a Steam server' },
     2: { 'name': 'Snap! New Zealand', 'server': '0.0.0.0',
@@ -262,7 +269,7 @@ isps = {
 
     10: { 'name': 'Telstra BigPond Australia', 'server': '0.0.0.0',
           'filter': '*:27030=203.39.198.136;' +
-                    'content?.steampowered.com=203.39.198.136' },
+                    'content*.steampowered.com=203.39.198.136' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au
@@ -281,7 +288,7 @@ isps = {
 
     11: { 'name': 'Internode Australia', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+                    'content*.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
           'allow': '//steam.cdn.on.net=*' },
 
     # iiNet are now special, because their Steam server (which is behind a
@@ -291,7 +298,7 @@ isps = {
 
     12: { 'name': 'iiNet Australia', 'server': '0.0.0.0',
           'filter': '*:27030=steam.cdn.on.net;' +
-                    'content?.steampowered.com=',
+                    'content*.steampowered.com=',
           'allow': '//steam.cdn.on.net=*' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
@@ -312,7 +319,7 @@ isps = {
 
     13: { 'name': 'Optus Australia', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.6,49.143.234.14;' +
-                    'content?.steampowered.com=49.143.234.6,49.143.234.14'  },
+                    'content*.steampowered.com=49.143.234.6,49.143.234.14'  },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
     # where iPrimus list their unmetered servers. That page has now gone and I
@@ -321,7 +328,7 @@ isps = {
 
     14: { 'name': 'iPrimus Australia', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+                    'content*.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
           'allow': '//steam.cdn.on.net=*' },
 
     # As with iPrimus since many of the old Steam servers listed as unmetered
@@ -329,7 +336,7 @@ isps = {
 
     15: { 'name': 'Westnet Internet Services (Perth, WA)', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+                    'content*.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
           'allow': '//steam.cdn.on.net=*' },
 
     # Adam appear to have a list of servers (unfortunately, not DNS names and also
@@ -343,7 +350,7 @@ isps = {
 
     16: { 'name': 'Adam Internet (Adelaide, SA)', 'server': '0.0.0.0',
           'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content?.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
+                    'content*.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
           'allow': '//steam.cdn.on.net=*' },
 
     17: { 'name': 'EAccess Broadband, Australia', 'server': '0.0.0.0',
@@ -365,13 +372,13 @@ isps = {
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/IS dual ISP',
-                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content*.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
                   }
               }
           }
         },
     31: { 'name': 'webafrica (Cape Town, South Africa)', 'server': '41.185.24.21',
-          'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za' },
+          'filter': '*:27030=steam.wa.co.za,steam2.wa.co.za;content*.steampowered.com=steam.wa.co.za,steam2.wa.co.za' },
     32: { 'name': 'Telkom SAIX, South Africa', 'server': '0.0.0.0',
           'filter': '# No known unmetered Steam server',
           'test': {
@@ -379,7 +386,7 @@ isps = {
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/SAIX dual ISP',
-                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content*.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
                   }
               }
           }
@@ -391,7 +398,7 @@ isps = {
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/MWeb dual ISP',
-                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content*.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
                   }
               }
           }
@@ -403,7 +410,7 @@ isps = {
               'steam.wa.co.za icmp *.wa.co.za': {
                   0: {
                       'ispname': 'WebAfrica/Cybersmart dual ISP',
-                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content?.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
+                      'filterrule': '*:27030=steam.wa.co.za,steam2.wa.co.za;content*.steampowered.com=steam.wa.co.za,steam2.wa.co.za'
                   }
               }
           }
@@ -422,7 +429,7 @@ isps = {
               'report': True,
               '193.4.194.101 80': {
                   0: {
-                      'filterrule': '*:27030=193.4.194.101;content?.steampowered.com=193.4.194.101'
+                      'filterrule': '*:27030=193.4.194.101;content*.steampowered.com=193.4.194.101'
                   }
               }
           }

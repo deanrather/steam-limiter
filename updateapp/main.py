@@ -225,14 +225,16 @@ isps = {
     # of the ISPs document this properly.
 
     # TelstraClear have made wlgwpstmcon01.telstraclear.co.nz go away, but the
-    # new name is steam.cdn.vodafone.co.nz which indicates potential progress
-    # to having a proper HTTP server, since the server actually isn't
-    # firewalled any more (that's a recent change). It may be that there is
-    # finally some progress there and I shall see if it requires a host rule
-    # rewrite of the new //steam.cdn.vodafone.co.nz form or not.
+    # new name is steam.cdn.vodafone.co.nz - Valve have actually just
+    # started to advertise this server as steam.cdn.vodafone.co.nz, so I'm also
+    # allowing it that way but it appears to not be blocking requests via the
+    # content*.steampowered.com name and so it's all good! It appears that
+    # despite no official announcement, they've actually done something right.
 
     0: { 'name': 'TelstraClear New Zealand', 'server': '203.167.129.4',
-         'filter': '*:27030=steam.cdn.vodafone.co.nz;content*.steampowered.com=steam.cdn.vodafone.co.nz' },
+         'filter': '*:27030=steam.cdn.vodafone.co.nz;content*.steampowered.com=steam.cdn.vodafone.co.nz',
+         'allow': '//steam.cdn.vodafone.co.nz=*' },
+
     1: { 'name': 'Orcon New Zealand', 'server': '0.0.0.0',
          'filter': '# Orcon no longer have a Steam server' },
     2: { 'name': 'Snap! New Zealand', 'server': '0.0.0.0',

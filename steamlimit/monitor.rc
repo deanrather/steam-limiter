@@ -156,37 +156,14 @@ BEGIN
     PUSHBUTTON "&No Thanks", IDOK, 125, 42, 50, 10
 END
 
-IDD_PROFILE DIALOGEX 0, 0, 250, 60
-STYLE DS_MODALFRAME | DS_SHELLFONT | WS_POPUP
-FONT 10, "MS Shell Dlg"
-BEGIN
-    RTEXT "&Pick Profile:", -1, 0, 3, 55, 10
-    COMBOBOX IDCB_PROFILE 57, 1, 80, 200, CBS_DROPDOWNLIST | WS_TABSTOP
 
-    PUSHBUTTON "&Cancel", IDCANCEL, 155, 2, 40, 10
-    DEFPUSHBUTTON "&OK", IDOK, 205, 2, 40, 10
+#include "profile.rc2"
 
-    RTEXT "Countr&y:", -2, 0, 14, 55, 10
-    EDITTEXT IDC_COUNTRY, 57, 14, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
+#undef  IDD_PROFILE
+#define IDD_PROFILE             IDD_PROFILE_MULTI
+#define FILTER_MULTILINE        1
 
-    RTEXT "&ISP:", -3, 0, 25, 55, 10
-    EDITTEXT IDC_ISP, 57, 25, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
-
-    PUSHBUTTON "Filter:|http://code.google.com/p/steam-limiter/wiki/FilterRules", IDC_FILTER_ABOUT, 0, 36, 55, 10, BS_RIGHT
-    RTEXT "&Filter:", -4, -99, 36, 55, 10
-    EDITTEXT IDC_FILTER, 57, 36, 188, 10, ES_AUTOHSCROLL | WS_TABSTOP
-
-    PUSHBUTTON "Keep updated:|http://code.google.com/p/steam-limiter/wiki/FilterUpdates", IDC_UPDATE_ABOUT, 0, 47, 55, 10, BS_RIGHT
-    AUTOCHECKBOX "&K", IDC_UPDATE, 57, 47, 10, 10, WS_TABSTOP
-
-    PUSHBUTTON "&Autodetect", IDC_AUTODETECT, 205, 48, 40, 10, WS_TABSTOP
-    /*
-     * Disable the "upload" button since it appears to be confusing to many
-     * people who are expecting it to be "apply", since that's a more common
-     * dialog element in Windows.
-     *   PUSHBUTTON "&Upload", IDC_UPLOAD, 205, 48, 40, 10, WS_TABSTOP
-     */
-END
+#include "profile.rc2"
 
 /////////////////////////////////////////////////////////////////////////////
 //

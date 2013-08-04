@@ -34,7 +34,8 @@ SetCompressor /SOLID lzma
 Name "Steam Content Server Limiter"
 RequestExecutionLevel user
 
-InstallDir "$PROGRAMFILES\LimitSteam"
+InstallDir "$LOCALAPPDATA\SteamLimiter"
+InstallDirRegKey HKCU "Software\SteamLimiter" "InstallLocation"
 
 Icon ..\steamlimit\monitor.ico
 
@@ -121,30 +122,65 @@ Function quitProgram
   Sleep 20
 FunctionEnd
 
+Function quitOldProgram
+  ExecWait '"$PROGRAMFILES\LimitSteam\steamlimit.exe" -quit'
+  Sleep 20
+FunctionEnd
+
+
 Section
   StrCpy $SETTINGS "Software\SteamLimiter"
 
-  IfFileExists $INSTDIR\steamlimit.exe 0 freshInstall
-
+  IfFileExists $INSTDIR\steamlimit.exe 0 checkOldInstall
   !insertmacro UAC_AsUser_Call Function quitProgram ${UAC_SYNCINSTDIR}
   goto upgrade
 
+checkOldInstall:
+  /*
+   * There are two upgrade scenarios; one where we uninstall from the current
+   * install directory, but as I am moving towards using $LOCALAPPDATA as the
+   * install directory there is also a need to migrate away from an older
+   * install that was in $PROGRAMFILES.
+   */
+
+  IfFileExists $PROGRAMFILES\LimitSteam\steamlimit.exe 0 freshInstall
+  !insertmacro UAC_AsUser_Call Function quitOldProgram ${UAC_SYNCINSTDIR}
+  goto upgrade
+
 freshInstall:
+upgrade:
   /*
    * By default, run at login. Since our app is so tiny, this is hardly
    * intrusive and undoing it is a simple context-menu item.
    *
-   * If upgrading, all this should still be in place so we leave it alone.
+   * We're really doing a per-user install only, not a machine-wide install,
+   * and as such the uninstall information should live in HKCU rather than
+   * HKLM.
    */
 
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SteamLimiter" \
                    "$\"$INSTDIR\steamlimit.exe$\""
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
-                   "DisplayName" "Steam Content Server Limiter"
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
-                   "UninstallString" "$\"$INSTDIR\uninst.exe$\""
+  DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
 
-upgrade:
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                   "DisplayName" "Steam Content Server Limiter"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                   "UninstallString" "$\"$INSTDIR\uninst.exe$\""
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                   "Publisher" "Nigel Bree <nigel.bree@gmail.com>"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                   "URLInfoAbout" "steam-limiter.googlecode.com"
+
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                     "NoModify" "1"
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter" \
+                     "NoRepair" "1"
+
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter"
+  DeleteRegKey HKLM "Software\SteamLimiter"
+
+  WriteRegStr HKCU "Software\SteamLimiter" "InstallLocation" "$INSTDIR"
+
   /*
    * Before we write the new steamfilter.dll, deal with any stray copies of it
    * that are still referenced; rarely, versions prior to v0.5 would be able to
@@ -153,7 +189,9 @@ upgrade:
    * works, so do that and then force it to be deleted.
    *
    * This also helps when Windows is just being stupid and hanging onto an open
-   * references to an executable even though the process has exited.
+   * reference to an executable after the process has exited (there are some
+   * reasons for this, but they are frustrating because the APIs around this
+   * are insufficient to write robust code).
    */
 
   Rename $INSTDIR\steamfilter.dll $INSTDIR\temp.dll
@@ -170,6 +208,13 @@ upgrade:
 
   Delete /REBOOTOK $INSTDIR\temp.dll
   Delete /REBOOTOK $INSTDIR\temp.exe
+
+  /*
+   * Now that I've moved Steam-limiter over to $LOCALAPPDATA, I can remove any
+   * old machine-wide installation.
+   */
+
+  RMDir /r "$PROGRAMFILES\LimitSteam"
 
   /*
    * Set the registry keys for the version options; from time to time we can
@@ -201,14 +246,6 @@ upgrade:
 
   DetailPrint 'Execute: reg import $\"$INSTDIR\serverlist_generic.reg$\"'
   nsExec::ExecToLog 'reg import "$INSTDIR\serverlist_generic.reg"'
-
-  /*
-   * See if there's a 0.3.0 filter setting inside HKLM - if so, move it to the
-   * HKCU key and launch the monitor app.
-   */
-
-  ReadRegStr $0 HKLM $SETTINGS "Server"
-  IfErrors 0 gotServerValue
 
   /*
    * See if there's an existing setting under HKCU - if so, preserve it and
@@ -292,13 +329,6 @@ setProfile:
 
 finishInstall:
   /*
-   * Remove all the pre-v0.4 settings.
-   */
-
-  DeleteRegKey HKLM $SETTINGS
-  DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
- 
-  /*
    * Remove pre-v0.5 settings that were moved to profile options.
    */
 
@@ -326,10 +356,20 @@ Section "Uninstall"
   Delete $INSTDIR\steamlimit.exe
   Delete $INSTDIR\steamfilter.dll
   RMDir $INSTDIR
-  
+
   DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
-  DeleteRegValue HKLM "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
-  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\LimitSteam"
-  DeleteRegKey HKLM "Software\SteamLimiter"
-  DeleteRegKey HKCU "Software\SteamLimiter"
+  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter"
+
+  /*
+   * I used to clean all this up, but it seems friendlier to maintain some of the 
+   * old configuration around. I will delete the replacement documents, but the
+   * custom configuration data can sit around harmlessly.
+   *
+   * A particular thing that is kept by this is "InstallLocation" so that now
+   * if the install location was previously customized, it stays customized on
+   * future reinstalls even after uninstallation.
+   */
+
+  DeleteRegKey HKCU "Software\SteamLimiter\Replace"
+  /* DeleteRegKey HKCU "Software\SteamLimiter" */
 SectionEnd

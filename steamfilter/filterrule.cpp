@@ -718,6 +718,22 @@ FilterRules :: ~ FilterRules () {
  *
  * The filter specification is roughly like this:
  *      rules   ::== <rule> (';' <rule>)*
+ *
+ * If I want to make it possible to support multi-line filter rules, then I
+ * have a difficult decision with respect to how to treat newlines. I can treat
+ * newlines as normal whitespace to be ignored, or I can treat them as similar
+ * to a semicolon as a rule separator.
+ *
+ * My best guess is that most people would be happiest with newlines as rule
+ * separators, it's just that as people cut-and-paste things through forums and
+ * other situations where newlines are inserted effectively at random, newlines
+ * will end up appearing in bad places and breaking rules, whereas the old way
+ * I used to (via the UI) of flattening out newlines wasn't as affected by that.
+ *
+ * As a compromise, I'll allow a newline to be a rule separator only after all
+ * the semicolons in a rule have been exhausted; any rules people make with
+ * only newline separators should work fine. What I do with this in the future
+ * will depend on user feedback.
  */
 
 bool FilterRules :: parse (const wchar_t * from, const wchar_t * to,
@@ -753,9 +769,23 @@ bool FilterRules :: parse (const wchar_t * from, const wchar_t * to,
                  * if there is one, and split the input there to do a simple
                  * recursion (as usual here, I avoid fancy techniques to keep
                  * the code size down).
+                 *
+                 * As part of trying to handle the introduction of multi-line
+                 * rules - something I'm not at all sure about - I'll make it
+                 * so that if there is no semicolon in the rest of the rule,
+                 * I'll treat a newline as an alternative separator.
+                 *
+                 * Probably I'll regret this; now I know how Brendan Eich feels
+                 * with semicolon handling in Javascript. :-/
                  */
 
                 const wchar_t * next = FilterRule :: lookahead (from, to, ';');
+                const wchar_t * line = FilterRule :: lookahead (from, to, '\n');
+                if (next == 0) {
+                        next = line;
+                } else if (line != 0 && line < next)
+                        next = line;
+
                 const wchar_t * nextTo;
                 if (next != 0) {
                         nextTo = to;
@@ -764,6 +794,15 @@ bool FilterRules :: parse (const wchar_t * from, const wchar_t * to,
                 } else {
                         nextTo = next = 0;
                 }
+
+                /*
+                 * It's easy for composite rules (especially now I allow the
+                 * use of newlines) to end up with bits of empty nothing that
+                 * we should skip.
+                 */
+
+                if (from == to)
+                        continue;
 
                 FilterRule    * temp = new FilterRule;
                 if (tail != 0) {

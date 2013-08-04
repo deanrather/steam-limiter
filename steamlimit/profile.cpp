@@ -202,8 +202,8 @@ void RegKey :: Binding :: operator >>= (ULONGLONG & value) {
  */
 
 Profile :: Profile (int index, const RegKey * root) :
-                m_index (index), m_reg (0), m_country (0),
-                m_isp (0), m_filter (0), m_update (false) {
+                m_index (index), m_reg (0), m_country (0), m_isp (0),
+                m_filter (0), m_hostFilter (0), m_update (0), m_joined (0) {
         if (root == 0 || m_index == g_noTraffic)
                 return;
 
@@ -329,6 +329,7 @@ void Profile :: fromRegistry (const Profile * from) {
         reg [L"Country"] >>= m_country;
         reg [L"ISP"] >>= m_isp;
         reg [L"Filter"] >>= m_filter;
+        reg [L"HostFilter"] >>= m_hostFilter;
         reg [L"Update"] >>= m_update;
 }
 
@@ -340,6 +341,7 @@ void Profile :: fromWindow (HWND window) {
         getValue (window, IDC_COUNTRY, m_country);
         getValue (window, IDC_ISP, m_isp);
         getValue (window, IDC_FILTER, m_filter);
+        getValue (window, IDC_HOSTFILTER, m_hostFilter);
         getValue (window, IDC_UPDATE, m_update);
 }
 
@@ -352,6 +354,7 @@ void Profile :: toRegistry (const Profile * to) {
         reg [L"Country"] <<= m_country;
         reg [L"ISP"] <<= m_isp;
         reg [L"Filter"] <<= m_filter;
+        reg [L"HostFilter"] <<= m_hostFilter;
         reg [L"Update"] <<= m_update;
 }
 
@@ -363,6 +366,7 @@ void Profile :: toWindow (HWND window, bool update) {
         setValue (window, IDC_COUNTRY, m_country);
         setValue (window, IDC_ISP, m_isp);
         setValue (window, IDC_FILTER, m_filter);
+        setValue (window, IDC_HOSTFILTER, m_hostFilter);
 
         /*
          * When transferring information from a temporary profile, leave the
@@ -371,6 +375,38 @@ void Profile :: toWindow (HWND window, bool update) {
 
         if (update)
                 setValue (window, IDC_UPDATE, m_update);
+}
+
+/**
+ * Return a composite filter with the normal and new host parts joined
+ * together.
+ */
+
+const wchar_t * Profile :: filter (void) {
+        if (m_joined != 0)
+                free (m_joined);
+
+        size_t          left = m_filter == 0 ? 0 : wcslen (m_filter);
+        size_t          right = m_hostFilter == 0 ? 0 : wcslen (m_hostFilter);
+
+        wchar_t       * dest;
+        dest = (wchar_t *) malloc ((left + 1 + right + 1) * sizeof (wchar_t));
+        m_joined = dest;
+
+        if (left > 0) {
+                memcpy (dest, m_filter, left * sizeof (wchar_t));
+                dest [left] = ';';
+                dest += left + 1;
+        }
+
+        if (right > 0) {
+                memcpy (dest, m_hostFilter, right * sizeof (wchar_t));
+                dest += right;
+        }
+
+        * dest = 0;
+
+        return m_joined;
 }
 
 /**@}*/

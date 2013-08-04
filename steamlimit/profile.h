@@ -89,7 +89,9 @@ private:
         wchar_t       * m_country;
         wchar_t       * m_isp;
         wchar_t       * m_filter;
+        wchar_t       * m_hostFilter;
         wchar_t       * m_update;
+        wchar_t       * m_joined;
 
         /* NOCOPY */    Profile (const Profile & copy);
 
@@ -101,7 +103,7 @@ public:
                         Profile (int index, const RegKey * root);
                       ~ Profile ();
 
-        const wchar_t * filter (void) const { return m_filter; }
+        const wchar_t * filter (void);
 
         void            fromRegistry (const Profile * from = 0);
         void            fromWindow (HWND window);

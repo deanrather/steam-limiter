@@ -419,6 +419,7 @@ var profile = install ? "A\\" : "D\\";
 
 if (bundle.ispName !== "Unknown") {
     shell.RegWrite (regPath + profile + "Filter", bundle.filterrule);
+    shell.RegWrite (regPath + profile + "HostFilter", bundle.allow);
     shell.RegWrite (regPath + profile + "ISP", bundle.ispname);
     shell.RegWrite (regPath + profile + "Country", bundle.country);
 }

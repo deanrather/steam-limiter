@@ -28,6 +28,8 @@
 #define IDB_UPGRADE                     32771
 
 #define IDD_PROFILE                     204
+#define IDD_PROFILE_MULTI               205
+
 #define IDCB_PROFILE                    32800
 #define IDC_COUNTRY                     32801
 #define IDC_ISP                         32802
@@ -35,9 +37,11 @@
 #define IDC_UPDATE                      32804
 #define IDC_AUTODETECT                  32805
 #define IDC_UPLOAD                      32806
+#define IDC_HOSTFILTER                  32807
 
 #define IDC_UPDATE_ABOUT                32904
 #define IDC_FILTER_ABOUT                32905
+#define IDC_HOSTFILTER_ABOUT            32906
 
 #define IDS_PROFILENAME                 500
 

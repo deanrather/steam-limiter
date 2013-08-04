@@ -28,6 +28,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\steamlimit\monitor.ico" />
+    <None Include="..\steamlimit\profile.rc2">
+      <FileType>RC</FileType>
+    </None>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{8AA82AF8-EBFD-408E-A7FF-224C0A6E9193}</ProjectGuid>

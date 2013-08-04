@@ -664,6 +664,7 @@ INT_PTR CALLBACK profileProc (HWND window, UINT message, WPARAM wparam,
 
                 Hyperlink :: attach (window, IDC_UPDATE_ABOUT);
                 Hyperlink :: attach (window, IDC_FILTER_ABOUT);
+                Hyperlink :: attach (window, IDC_HOSTFILTER_ABOUT);
 
                 addStrings (window, IDCB_PROFILE, IDS_PROFILENAME);
 
@@ -787,6 +788,10 @@ INT_PTR CALLBACK profileProc (HWND window, UINT message, WPARAM wparam,
 
 /**
  * Show the profile-selection dialog.
+ *
+ * I now have a simple and advanced version of this as I experiment with
+ * giving people more UI options. For now I'll show IDD_PROFILE_MULTI but
+ * I may make a tickbox or registry key for going back to IDD_PROFILE.
  */
 
 void showProfile (void) {
@@ -796,9 +801,9 @@ void showProfile (void) {
         }
 
         HMODULE         self = GetModuleHandle (0);
-        g_profileWindow = CreateDialogW (self, MAKEINTRESOURCE (IDD_PROFILE), 0,
-                                         profileProc);
+        wchar_t       * name = MAKEINTRESOURCE (IDD_PROFILE_MULTI);
 
+        g_profileWindow = CreateDialogW (self, name, 0, profileProc);
         showCentered (g_profileWindow);
 }
 

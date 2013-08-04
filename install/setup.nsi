@@ -210,6 +210,14 @@ upgrade:
   Delete /REBOOTOK $INSTDIR\temp.exe
 
   /*
+   * Put a shortcut into the Start menu in the "Steam" folder, where Valve
+   * tend to put Steam content like games so it's open for us to use.
+   */
+
+  CreateShortcut "$SMPROGRAMS\Steam\Start Steam-limiter.lnk" \
+                "$INSTDIR\steamlimit.exe"
+
+  /*
    * Now that I've moved Steam-limiter over to $LOCALAPPDATA, I can remove any
    * old machine-wide installation.
    */

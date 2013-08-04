@@ -177,6 +177,9 @@ void runCommand (const wchar_t * command, const wchar_t * parameters = 0,
         SHELLEXECUTEINFOW exec = { sizeof (exec) };
         exec.lpFile = command;
         exec.lpParameters = parameters;
+        exec.fMask |= SEE_MASK_FLAG_NO_UI;
+
+        HWND            window = GetActiveWindow ();
 
         if (wait) {
                 /*
@@ -184,7 +187,9 @@ void runCommand (const wchar_t * command, const wchar_t * parameters = 0,
                  */
 
                 exec.fMask |= SEE_MASK_NOCLOSEPROCESS;
-                SetCursor (LoadCursor (0, IDC_WAIT));
+
+                HCURSOR         glass = LoadCursor (0, IDC_WAIT);
+                SetCursor (glass);
         }
 
         /*
@@ -201,6 +206,7 @@ void runCommand (const wchar_t * command, const wchar_t * parameters = 0,
 
         exec.lpDirectory = path;
         ShellExecuteExW (& exec);
+        SetFocus (window);
 
         if (! wait)
                 return;
@@ -719,9 +725,21 @@ INT_PTR CALLBACK profileProc (HWND window, UINT message, WPARAM wparam,
                         /*
                          * Write to the "temp" profile, then load it into the
                          * window context.
+                         *
+                         * Since Windows is pretty awful at displaying the
+                         * hourglass cursor when doing a ShellExecute despite
+                         * the thing we're running being hidden, disable the
+                         * button to give a visual indicator we're doing
+                         * something. Maybe I should swap out the button text
+                         * too, but for now maybe this will do.
                          */
 
+                        HWND            button = GetDlgItem (window, IDC_AUTODETECT);
+                        EnableWindow (button, FALSE);
+
                         runCommand (L"wscript.exe", L"setfilter.js", true);
+
+                        EnableWindow (button, TRUE);
 
                         Profile         current (Profile :: g_temp, & g_settings);
                         current.toWindow (window, false);

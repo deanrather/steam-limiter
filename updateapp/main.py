@@ -244,7 +244,7 @@ isps = {
     4: { 'name': 'Lightstream, Waikato New Zealand', 'server': '202.124.127.66',
          'filter': '*:27030=202.124.127.66' },
     5: { 'name': 'Xnet/WorldxChange New Zealand', 'server': '58.28.25.146',
-         'filter': '*:27030=58.28.25.146' },
+         'filter': '# XNet no longer have a Steam server' },
     6: { 'name': 'ACSData, Wellington NZ', 'server': '0.0.0.0',
          'filter': '# No known unmetered Steam server' },
     7: { 'name': 'Vodafone New Zealand', 'server': '0.0.0.0',

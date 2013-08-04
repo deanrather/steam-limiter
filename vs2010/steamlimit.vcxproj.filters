@@ -51,5 +51,8 @@
     <None Include="..\steamlimit\monitor.ico">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="..\steamlimit\profile.rc2">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

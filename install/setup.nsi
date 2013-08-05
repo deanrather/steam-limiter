@@ -214,7 +214,7 @@ upgrade:
    * tend to put Steam content like games so it's open for us to use.
    */
 
-  CreateShortcut "$SMPROGRAMS\Steam\Start Steam-limiter.lnk" \
+  CreateShortcut "$SMPROGRAMS\Steam\Start steam-limiter.lnk" \
                 "$INSTDIR\steamlimit.exe"
 
   /*
@@ -357,13 +357,15 @@ Section "Uninstall"
 
   Sleep 20
 
-  Delete $INSTDIR\serverlist_generic.reg
-  Delete $INSTDIR\setfilter.js
-  Delete $INSTDIR\uninst.exe
-  Delete $INSTDIR\probe.exe
-  Delete $INSTDIR\steamlimit.exe
-  Delete $INSTDIR\steamfilter.dll
-  RMDir $INSTDIR
+  Delete "$INSTDIR\serverlist_generic.reg"
+  Delete "$INSTDIR\setfilter.js"
+  Delete "$INSTDIR\uninst.exe"
+  Delete "$INSTDIR\probe.exe"
+  Delete "$INSTDIR\steamlimit.exe"
+  Delete "$INSTDIR\steamfilter.dll"
+  Delete "$SMPROGRAMS\Steam\Start steam-limiter.lnk"
+
+  RMDir "$INSTDIR"
 
   DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" SteamLimit
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\SteamLimiter"

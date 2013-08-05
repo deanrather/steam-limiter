@@ -46,12 +46,6 @@
 # since that's my ISP, but the filter app is usable by other New Zealand ISPs
 # and it would be nice to be able to make that seamless.
 #
-# The tradeoff there, however, is that to learn what the external IP ranges for
-# ISPs are takes some effort, and really the easiest way to do that is to log
-# them (even if it's just to the Python log for me to cast an eyeball over, not
-# to a datastore); similarly, it's good for the update check to not just be a
-# static page.
-#
 
 import jinja2
 import os
@@ -69,7 +63,7 @@ from google.appengine.api import users, xmpp, mail
 code_ui_base = 'http://code.google.com/p/steam-limiter/'
 code_file_base = 'http://steam-limiter.googlecode.com/files/'
 
-latest_version = '0.6.1.0'
+latest_version = '0.7.0.0'
 latest_file = 'steamlimit-' + latest_version + '.exe'
 
 # If I want to map source IPs to ISP names, you'd normally just do some kind of
@@ -248,7 +242,7 @@ isps = {
     6: { 'name': 'ACSData, Wellington NZ', 'server': '0.0.0.0',
          'filter': '# No known unmetered Steam server' },
     7: { 'name': 'Vodafone New Zealand', 'server': '0.0.0.0',
-         'filter': '# No known unmetered Steam server' },
+         'filter': '# steam.cdn.vodafone.co.nz is coming soon!' },
     8: { 'name': 'Telecom/XTRA New Zealand', 'server': '0.0.0.0',
          'filter': '# No known unmetered Steam server' },
     9: { 'name': 'InSPire New Zealand', 'server': '0.0.0.0',

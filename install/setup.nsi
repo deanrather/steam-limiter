@@ -197,6 +197,19 @@ upgrade:
   Rename $INSTDIR\steamfilter.dll $INSTDIR\temp.dll
   Rename $INSTDIR\steamlimit.exe $INSTDIR\temp.exe
 
+  /*
+   * Now that I've moved Steam-limiter over to $LOCALAPPDATA, I can remove any
+   * old machine-wide installation. Of course, if the install location has been
+   * manually set to the old machine-wide location, I need to not wipe out the
+   * directory and most of all I need to not do this *after* I install the
+   * program in there. Because that would be stupid, as I learned by actually
+   * having the install script do that. Ahem.
+   */
+
+  StrCmp "$INSTDIR" "$PROGRAMFILES\LimitSteam" noremove
+  RMDir /r "$PROGRAMFILES\LimitSteam"
+noRemove:
+
   SetOutPath $INSTDIR
   WriteUninstaller $INSTDIR\uninst.exe
 
@@ -216,13 +229,6 @@ upgrade:
 
   CreateShortcut "$SMPROGRAMS\Steam\Start steam-limiter.lnk" \
                 "$INSTDIR\steamlimit.exe"
-
-  /*
-   * Now that I've moved Steam-limiter over to $LOCALAPPDATA, I can remove any
-   * old machine-wide installation.
-   */
-
-  RMDir /r "$PROGRAMFILES\LimitSteam"
 
   /*
    * Set the registry keys for the version options; from time to time we can

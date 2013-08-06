@@ -227,6 +227,7 @@ noRemove:
    * tend to put Steam content like games so it's open for us to use.
    */
 
+  CreateDirectory "$SMPROGRAMS\Steam"
   CreateShortcut "$SMPROGRAMS\Steam\Start steam-limiter.lnk" \
                 "$INSTDIR\steamlimit.exe"
 

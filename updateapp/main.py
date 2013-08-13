@@ -262,10 +262,17 @@ isps = {
     # (it's hard to make sense of that thread since there's conflicting
     # information there and you can't tell who is official Telstra and
     # who's just some random person).
+    # A later follow-up on that thread finally documented a DNS name for
+    # their servers; the Telstra DNS doesn't include a reverse lookup
+    # from the IP to the name since they are pretty incompetent, but the
+    # name appears to be real and I'm tossing in an 'allow' filter for
+    # that host since I'm guessing that's the primary way it's advertised
+    # and that allowing it will permit more download parallelism.
 
     10: { 'name': 'Telstra BigPond Australia', 'server': '0.0.0.0',
-          'filter': '*:27030=203.39.198.136;' +
-                    'content*.steampowered.com=203.39.198.136' },
+          'filter': '*:27030=steam.content.bigpondgames.com;' +
+                    'content*.steampowered.com=steam.content.bigpondgames.com',
+          'allow': '//steam.content.bigpondgames.com=*' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au
@@ -314,8 +321,7 @@ isps = {
     # Optus don't support on.net either, I'll do that same for that.
 
     13: { 'name': 'Optus Australia', 'server': '0.0.0.0',
-          'filter': '*:27030=49.143.234.6,49.143.234.14;' +
-                    'content*.steampowered.com=49.143.234.6,49.143.234.14'  },
+          'filter': '# Optus do not have any unmetered Steam servers' },
 
     # Angus Wolfcastle pointed out http://www.ipgn.com.au/Support/Support/Steam
     # where iPrimus list their unmetered servers. That page has now gone and I

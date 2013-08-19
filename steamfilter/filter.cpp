@@ -255,6 +255,7 @@ Hook<RecvFunc>          g_recvHook;
 Hook<RecvFromFunc>      g_recvfromHook;
 Hook<WSARecvFunc>       g_wsaRecvHook;
 Hook<selectFunc>        g_select_Hook;
+Hook<SendFunc>          g_sendHook;
 Hook<WSAGetOverlappedFunc> g_wsaGetOverlappedHook;
 Hook<WSAEventSelectFunc> g_wsaEventSelectHook;
 Hook<WSAEnumNetworkEventsFunc> g_wsaEnumNetworkEventsHook;
@@ -1201,6 +1202,92 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
 }
 
 /**
+ * Helper for WSASend () etc to optionally log raw sends to OutputDebugString.
+ *
+ * Since the output function requires a NUL terminator, break up the output
+ * into segments (copying into a staging buffer).
+ */
+
+void debugWrite (const char * func, const char * buf, size_t len) {
+        char            temp [128];
+        wsprintfA (temp, "%s: %d bytes\r\n", func, len);
+        OutputDebugStringA (temp);
+
+        while (len > 0) {
+                size_t          some = ARRAY_LENGTH (temp) - 1;
+                if (len < some)
+                        some = len;
+
+                memcpy (temp, buf, some);
+                temp [some] = 0;
+
+                OutputDebugStringA (temp);
+
+                buf += some;
+                len -= some;
+        }
+}
+
+/**
+ * Flag whether to write raw data to OutputDebugString ().
+ *
+ * This is mainly for debugging; if needed I'll create a registry setting to
+ * let people enable it in the field.
+ */
+
+bool            g_debugSend = false;
+
+/**
+ * Hook the legacy BSD sockets Send () function.
+ *
+ * One of the Steam beta clients uses the BSD functions instead of the native
+ * Windows ones.
+ */
+
+int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
+        InHook          hooking;
+
+        if (g_debugSend)
+                debugWrite ("WSASend", buf, len);
+
+        size_t          length = len;
+        const char    * replace = buf;
+        replace = filterHttpUrl (s, replace, length);
+
+        if (length == 0) {
+                OutputDebugStringA ("Substituting HTTP request\r\n");
+                return 0;
+        }
+
+        if (buf == 0) {
+                SetLastError (WSAECONNRESET);
+                return SOCKET_ERROR;
+        }
+
+        /*
+         * Pass-through is the simple case.
+         */
+
+        if (replace == buf)
+                return (* g_sendHook) (s, buf, len, flags);
+
+        /*
+         * The complexity with replacing is mainly in the return value to hide
+         * the extra length we inserted.
+         */
+
+        int             result;
+        result = (* g_sendHook) (s, replace, (int) length, flags);
+
+        HeapFree (GetProcessHeap (), 0, (LPVOID) replace);
+
+        if (result == length)
+                return len;
+
+        return 0;
+}
+
+/**
  * Hook WSASend and do some basic inspection of the outgoing data.
  *
  * The intention here is to allow some crude filtering of HTTP URLs, in a form
@@ -1222,6 +1309,10 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
 
         const char    * buf = buffers [0].buf;
         size_t          len = buffers [0].len;
+
+        if (g_debugSend)
+                debugWrite ("WSASend", buf, len);
+
         buf = filterHttpUrl (s, buf, len);
 
         if (len == 0) {
@@ -1549,6 +1640,7 @@ void unhookAll (void) {
         g_recvfromHook.unhook ();
         g_wsaRecvHook.unhook ();
         g_select_Hook.unhook ();
+        g_sendHook.unhook ();
         g_closesocket_Hook.unhook ();
         g_wsaEventSelectHook.unhook ();
         g_wsaGetOverlappedHook.unhook ();
@@ -1631,6 +1723,7 @@ STEAMDLL (int) SteamFilter (wchar_t * address, wchar_t * result,
                   g_recvfromHook.attach (recvfromHook, ws2, "recvfrom") &&
                   g_wsaRecvHook.attach (wsaRecvHook, ws2, "WSARecv") &&
                   g_select_Hook.attach (select_Hook, ws2, "select") &&
+                  g_sendHook.attach (sendHook, ws2, "send") &&
                   g_closesocket_Hook.attach (closesocket_Hook, ws2,
                                              "closesocket") && 
                   g_wsaEventSelectHook.attach (wsaEventSelectHook, ws2,

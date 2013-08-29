@@ -1248,7 +1248,7 @@ int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
         InHook          hooking;
 
         if (g_debugSend)
-                debugWrite ("WSASend", buf, len);
+                debugWrite ("send", buf, len);
 
         size_t          length = len;
         const char    * replace = buf;

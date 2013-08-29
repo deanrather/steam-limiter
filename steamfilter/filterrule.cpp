@@ -780,7 +780,7 @@ bool FilterRules :: parse (const wchar_t * from, const wchar_t * to,
                  */
 
                 const wchar_t * next = FilterRule :: lookahead (from, to, ';');
-                const wchar_t * line = FilterRule :: lookahead (from, to, '\n');
+                const wchar_t * line = FilterRule :: lookahead (from, to, '\r');
                 if (next == 0) {
                         next = line;
                 } else if (line != 0 && line < next)

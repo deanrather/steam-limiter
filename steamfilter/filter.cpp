@@ -1245,6 +1245,11 @@ bool            g_debugSend = false;
  */
 
 int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
+        if (buf == 0) {
+                SetLastError (WSAEINVAL);
+                return SOCKET_ERROR;
+        }
+
         InHook          hooking;
 
         if (g_debugSend)
@@ -1256,10 +1261,10 @@ int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
 
         if (length == 0) {
                 OutputDebugStringA ("Substituting HTTP request\r\n");
-                return 0;
+                return len;
         }
 
-        if (buf == 0) {
+        if (replace == 0) {
                 SetLastError (WSAECONNRESET);
                 return SOCKET_ERROR;
         }
@@ -1283,6 +1288,8 @@ int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
 
         if (result == length)
                 return len;
+        if (result < 0)
+                return result;
 
         return 0;
 }
@@ -1309,6 +1316,11 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
 
         const char    * buf = buffers [0].buf;
         size_t          len = buffers [0].len;
+
+        if (buf == 0) {
+                SetLastError (WSAEINVAL);
+                return SOCKET_ERROR;
+        }
 
         if (g_debugSend)
                 debugWrite ("WSASend", buf, len);

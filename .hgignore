@@ -6,3 +6,5 @@ vs201?/*.user
 vs201?/*.*sdf
 vs201?/ipch/*
 *.pyc
+.git*
+.idea/*

@@ -85,7 +85,7 @@ bool globMatch (const char * example, const wchar_t * pattern,
                  * that '*' doesn't match - like '/' in the old UNIX shell,
                  * although that was more because path structure got parsed out
                  * of patterns first (and each path level was processed as part
-                 * of directly expansion) - or because even if we do a trailing
+                 * of directory expansion) - or because even if we do a trailing
                  * '*' can safely be a special case.
                  */
 

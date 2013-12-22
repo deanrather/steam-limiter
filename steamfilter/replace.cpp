@@ -341,6 +341,16 @@ struct Replacement : public SocketTrack {
 };
 
 /**
+ * Structure for representing an context where we're discarding output.
+ */
+
+struct Discarding : public SocketTrack {
+        unsigned long   m_length;
+
+                        Discarding (SOCKET handle) : SocketTrack (handle) { }
+};
+
+/**
  * The global list of bound event handles for sockets.
  */
 
@@ -351,6 +361,12 @@ SocketList<SocketTrack> l_events;
  */
 
 SocketList<Replacement> l_replace;
+
+/**
+ * Global list of sockets where we are discarding sent data.
+ */
+
+SocketList<Discarding>  l_discard;
 
 /**
  * Root registry key in which replacement items are located.
@@ -418,6 +434,7 @@ void g_addEventHandle (SOCKET handle, WSAEVENT event) {
 void g_removeTracking (SOCKET handle) {
         l_events.remove (handle);
         l_replace.remove (handle);
+        l_discard.remove (handle);
 }
 
 /**
@@ -467,17 +484,22 @@ static  char          * months [13] = {
  * Helper for g_addReplacement (), create a replacement item record.
  */
 
-bool l_addReplacement (SOCKET handle, const wchar_t * replacement) {
+bool g_addReplacement (SOCKET handle, const wchar_t * replacement, int status,
+                       const char * extraText) {
         /*
          * Compute the space required to hold a UTF-8 version of the input, and
          * any template-type substitution needed (not that we support that as
          * yet).
          */
 
-        int             utf8;
-        utf8 = WideCharToMultiByte (CP_UTF8, 0, replacement, - 1, 0, 0, 0, 0);
-        if (utf8 == 0)
-                return false;
+        int             utf8 = 0;
+        if (replacement != 0) {
+                utf8 = WideCharToMultiByte (CP_UTF8, 0, replacement, - 1, 0, 0, 0, 0);
+                if (utf8 == 0)
+                        return false;
+
+                -- utf8;
+        }
 
         /*
          * Given the size of the replacement document, we can prepare the HTTP
@@ -489,19 +511,48 @@ bool l_addReplacement (SOCKET handle, const wchar_t * replacement) {
         if (! l_formatDate (date, ARRAY_LENGTH (date)))
                 return false;
 
+        char            redirect [512];
+
+        const char    * location = "";
+        const char    * statusText = "UNKNOWN";
+        switch (status) {
+        case 200:
+                if (replacement == 0 && extraText != 0)
+                        utf8 = strlen (extraText);
+
+                statusText = "OK";
+                break;
+
+        case 302:
+                if (extraText == 0)
+                        return false;
+
+                wsprintfA (redirect, "Location: %s\r\n", extraText);
+                location = redirect;
+
+                statusText = "REDIRECT";
+                break;
+
+        default:
+                if (extraText != 0)
+                        statusText = extraText;
+                break;
+        }
+
         char            header [1024];
         wsprintfA (header,
-                   "HTTP/1.1 200 OK\r\n"
+                   "HTTP/1.1 %d %s\r\n"
                    "Date: %s\r\n"
                    "Expires: %s\r\n"
                    "Content-Type: text/html; charset=UTF8\r\n"
                    "Content-Length: %ld\r\n"
                    "Connection: Keep-Alive\r\n"
-                   "\r\n", date, date, utf8 - 1);
+                   "%s"
+                   "\r\n", status, statusText, date, date, utf8, location);
 
         size_t          headerLength = strlen (header);
 
-        unsigned long   size = sizeof (Replacement) + headerLength + utf8;
+        unsigned long   size = sizeof (Replacement) + headerLength + utf8 + 1;
 
         /*
          * Allocate the replacement control structure, and copy the replacement
@@ -516,15 +567,39 @@ bool l_addReplacement (SOCKET handle, const wchar_t * replacement) {
         item->m_data = (unsigned char *) (item + 1);
 
         memcpy (item->m_data, header, headerLength);
-        utf8 = WideCharToMultiByte (CP_UTF8, 0, replacement, - 1,
-                                    (LPSTR) item->m_data + headerLength,
-                                    utf8, 0, 0);
-        if (utf8 == 0) {
-                delete item;
-                return false;
+
+        if (replacement != 0) {
+                utf8 = WideCharToMultiByte (CP_UTF8, 0, replacement, - 1,
+                                            (LPSTR) item->m_data + headerLength,
+                                            utf8, 0, 0);
+                if (utf8 == 0) {
+                        delete item;
+                        return false;
+                }
+                -- utf8;
+        } else if (utf8 > 0) {
+                /*
+                 * An alternative way to supply content via a #200 rule. In
+                 * this mode, we use ~ as an escape for '\n';
+                 */
+
+                unsigned char * dest = item->m_data + headerLength;
+                unsigned long   count = utf8;
+                while (count > 0) {
+                        unsigned char   ch = * extraText;
+                        ++ extraText;
+
+                        if (ch == '~')
+                                ch = '\n';
+
+                        * dest = ch;
+
+                        ++ dest;
+                        -- count;
+                }
         }
 
-        item->m_length = headerLength + utf8 - 1;
+        item->m_length = headerLength + utf8;
         item->m_offset = 0;
 
         l_replace.add (* item);
@@ -609,7 +684,7 @@ bool g_addReplacement (SOCKET handle, const char * name, const char * /* url */)
         }
 
         bool            value;
-        value = l_addReplacement (handle, replacement);
+        value = g_addReplacement (handle, replacement, 200, 0);
         HeapFree (GetProcessHeap (), 0, replacement);
         return value;
 }
@@ -662,5 +737,54 @@ bool g_consumeReplacement (Replacement * item, unsigned long length, void * buf,
         return true;
 }
 
+/**
+ * Add a notice to discard data from a handle
+ */
+
+bool g_addDiscard (SOCKET handle, unsigned long length) {
+        if (length == 0)
+                return false;
+
+        /*
+         * Allocate the replacement control structure, and copy the replacement
+         * document text into it (converting to UTF-8).
+         */
+
+        Discarding    * item = new Discarding (handle);
+        if (item == 0)
+                return false;
+
+        item->m_length = length;
+        l_discard.add (* item);
+        return true;
+}
+
+/**
+ * Determine if we're discarding output from this socket.
+ */
+
+Discarding * g_findDiscard (SOCKET handle) {
+        return l_discard.find (handle);
+}
+
+/**
+ * Consume some amount of data from the discard record.
+ */
+
+bool g_consumeDiscard (Discarding * item, unsigned long length, unsigned long * skip) {
+        unsigned long   used = item->m_length;
+        if (length < used)
+                used = length;
+
+        item->m_length -= used;
+        length -= used;
+
+        if (skip != 0)
+                * skip = used;
+
+        if (item->m_length == 0)
+                l_discard.remove (item, true);
+        return true;
+}
 
 /**@}*/

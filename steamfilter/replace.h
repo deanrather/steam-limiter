@@ -36,6 +36,7 @@
  */
 
 struct Replacement;
+struct Discarding;
 
 #include <winsock2.h>
 
@@ -50,9 +51,17 @@ void            g_removeTracking (SOCKET handle);
 void            g_replacementCache (const wchar_t * name);
 bool            g_addReplacement (SOCKET handle, const char * name,
                                   const char * url);
+bool            g_addReplacement (SOCKET handle, const wchar_t * replacement,
+                                  int status = 200, const char * extraText = 0);
+
 Replacement   * g_findReplacement (SOCKET handle);
 bool            g_consumeReplacement (Replacement * item, unsigned long length,
                                       void * buf, unsigned long * copied);
+
+bool            g_addDiscard (SOCKET handle, unsigned long length);
+Discarding    * g_findDiscard (SOCKET handle);
+bool            g_consumeDiscard (Discarding * item, unsigned long length,
+                                  unsigned long * skip);
 
 /**@}*/
 #endif  /*! defined (REPLACE_H) */

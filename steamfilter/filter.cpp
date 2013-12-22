@@ -910,11 +910,39 @@ char * splice (const char * base, const char * from, const char * to,
         }
 
         * out = 0;
+        length = total;
 
 #if     0
         OutputDebugStringA (out);
 #endif
         return copy;
+}
+
+/*
+ * Parse a status code out of a #-type rule.
+ */
+
+unsigned long l_getStatus (const char * & replace) {
+        unsigned long   status = 0;
+        const char    * scan = replace;
+        while (* scan == ' ')
+                ++ scan;
+
+        unsigned char   ch;
+        while ((ch = * scan) != 0) {
+                ch -= '0';
+                if (ch > 9)
+                        break;
+
+                status = status * 10 + ch;
+                ++ scan;
+        }
+
+        while (* scan == ' ')
+                ++ scan;
+
+        replace = scan;
+        return status;
 }
 
 
@@ -977,6 +1005,23 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
         }
 
         char          * dest = temp;
+
+        /*
+         * To allow substituting the content of POST operations, parse out the
+         * content-length being sent.
+         */
+
+        const char    * lengthHeader;
+        unsigned long   contentLength = 0;
+        lengthHeader = c_memifind (buf, "content-length: ", length);
+        if (lengthHeader != 0) {
+                /*
+                 * Parse out the content length using a function not intended
+                 * for that purpose, since I'm being cheap and nasty.
+                 */
+
+                contentLength = l_getStatus (lengthHeader);
+        }
 
         /*
          * Use getPeerName () so I can show the actual target IP in the debug
@@ -1159,9 +1204,35 @@ const char * filterHttpUrl (SOCKET s, const char * buf, size_t & length) {
                  * data through.
                  */
 
-                if (g_addReplacement (s, replace + 1, urlPart))
+                if (g_addReplacement (s, replace + 1, urlPart)) {
+                        g_addDiscard (s, contentLength);
                         length = 0;
+                }
                         
+                return 0;
+        }
+
+        /*
+         * A pattern starting with # returns a simple replacement where we
+         * return an empty document with the indicated status code, so #200 is
+         * just a simple way to stub something out and accept it.
+         */
+
+        if (replace [0] == '#') {
+                ++ replace;
+
+                int             status = l_getStatus (replace);
+                if (status > 0 && g_addReplacement (s, 0, status, replace)) {
+                        /*
+                         * Let the caller know we're replacing things.
+                         */
+
+                        g_addDiscard (s, contentLength);
+                        length = 0;
+                        return 0;
+                }
+
+                OutputDebugStringA ("Failed to replace status\r\n");
                 return 0;
         }
 
@@ -1252,6 +1323,18 @@ int WSAAPI sendHook (SOCKET s, const char * buf, int len, int flags) {
 
         InHook          hooking;
 
+        Discarding    * discard = g_findDiscard (s);
+        if (discard != 0) {
+                unsigned long   skip = 0;
+                g_consumeDiscard (discard, len, & skip);
+                if (len > skip) {
+                        int             sent;
+                        len = (* g_sendHook) (s, buf + skip, len - skip, flags);
+                } else
+                        len = 0;
+                return len + skip;
+        }
+
         if (g_debugSend)
                 debugWrite ("send", buf, len);
 
@@ -1320,6 +1403,18 @@ int WSAAPI wsaSendHook (SOCKET s, LPWSABUF buffers, unsigned long count,
         if (buf == 0) {
                 SetLastError (WSAEINVAL);
                 return SOCKET_ERROR;
+        }
+
+        Discarding    * discard = g_findDiscard (s);
+        if (discard != 0) {
+                unsigned long   skip = 0;
+                g_consumeDiscard (discard, len, & skip);
+                if (len > skip) {
+                        int             sent;
+                        len = (* g_sendHook) (s, buf + skip, len - skip, flags);
+                } else
+                        len = 0;
+                return len + skip;
         }
 
         if (g_debugSend)
@@ -1432,6 +1527,23 @@ unsigned char * writeOffset (unsigned char * dest, unsigned long value) {
 
 HMODULE         g_instance;
 
+/*
+ * A possible fake response to /initsession/ using ~ as a escape for newline.
+ *
+ * Outbound requests to CS-type servers tend to include this in an x-steam-auth
+ * custom header, presumably for Valve's own analytics. Fiddling with this is
+ * thus not entirely kosher, but we really don't have much option to help keep
+ * Steam happy when we can't allow it to use any of the real "CS" servers and
+ * we would prefer to redirect it elsewhere.
+ */
+
+#define INITSESSION_RESPONSE \
+        L"\"response\"~{" \
+        L"\t\"sessionid\"\t\t\"12345678901234567890\"~" \
+        L"\t\"req-counter\"\t\t\"0\"~" \
+        L"\t\"csid\"\t\t\"99\"~" \
+        L"}~"
+
 /**
  * Set up the address to direct the content server connections to.
  */
@@ -1441,20 +1553,25 @@ int setFilter (wchar_t * address) {
         if (result) {
                 /*
                  * For now, always append these black-hole rules to the main
-                 * rule set, along with a couple of rules to try and manage the
-                 * "CS" type servers out of use and as well eliminate any
-                 * server listed in a special server list that hasn't already
-                 * been whitelisted.
+                 * rule set, along with a couple of rules to eliminate any
+                 * server that hasn't already been whitelisted.
                  *
                  * Since rules are processed in order, this still allows custom
                  * rules to redirect these DNS lookups to take place, as those
                  * will take precedence to this catch-all; in a rule list, the
                  * first rule that matches stops further search.
+                 *
+                 * The last two rules here substitute out both of the special
+                 * URLs used by "CS"-type servers, which in reality are just
+                 * normal HTTP servers. We fake up session data for them so
+                 * that we can avoid problems inside Steam (leading to crash
+                 * bugs) caused by denying them, and allow host rules to trick
+                 * Steam into using regular HTTP servers instead.
                  */
 
-                g_rules.append (L"//*.steampowered.com=*;"
-                                L"//*/depot/*=;"
-                                L"/initsession/=");
+                g_rules.append (L"//*/depot/*=;"
+                                L"/authdepot/=#200;"
+                                L"/initsession/=#200 " INITSESSION_RESPONSE);
         }
 
         return result ? 1 : 0;

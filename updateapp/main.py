@@ -229,7 +229,9 @@ isps = {
          'filter': '*:27030=steam.cdn.vodafone.co.nz;' +
                    'content*.steampowered.com=steam.cdn.vodafone.co.nz;' +
                    '*.cs.steampowered.com=steam.cdn.vodafone.co.nz',
-         'allow': '//steam.cdn.vodafone.co.nz=*;//*.steampowered.com=*' },
+         'allow': '//steam.cdn.vodafone.co.nz=*;' +
+                  '//content*.steampowered.com=steam.cdn.vodafone.co.nz;' +
+                  '//*.cs.steampowered.com=steam.cdn.vodafone.co.nz' },
 
     1: { 'name': 'Orcon New Zealand', 'server': '0.0.0.0',
          'filter': '# Orcon no longer have a Steam server' },
@@ -275,7 +277,9 @@ isps = {
           'filter': '*:27030=steam.content.bigpondgames.com;' +
                     'content*.steampowered.com=steam.content.bigpondgames.com;' +
                     '*.cs.steampowered.com=steam.content.bigpondgames.com',
-          'allow': '//steam.content.bigpondgames.com=*;//*.steampowered.com=*' },
+          'allow': '//steam.content.bigpondgames.com=*;' +
+                   '//content*.steampowered.com=steam.content.bigpondgames.com;' +
+                   '//*.cs.steampowered.com=steam.content.bigpondgames.com' },
 
     # For a long time the iiNet rule was only these three specific servers:
     # *:27030=steam1.filearena.net,steam-wa.3fl.net.au,steam-nsw.3fl.net.au
@@ -307,7 +311,9 @@ isps = {
           'filter': '*:27030=steam.cdn.on.net;' +
                     'content*.steampowered.com=steam.cdn.on.net;' +
                     '*.cs.steampowered.com=steam.cdn.on.net',
-          'allow': '//steam.cdn.on.net=*;//*.steampowered.com=*' },
+          'allow': '//steam.cdn.on.net=*;' +
+                   '//content*.steampowered.com=steam.cdn.on.net;' +
+                   '//*.cs.steampowered.com=steam.cdn.on.net' },
 
     # Evidently Optus actually don't actually offer any unmetered content, so
     # these server selections are intended more for download performance than

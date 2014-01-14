@@ -236,23 +236,25 @@ new_isps = {
 
 # Simple utility cliches.
 
-def bundle (handler, isps = new_isps, defaults = new_defaults):
-    return app_common.bundle (handler, isps, defaults)
+def bundle (handler, isps = new_isps, defaults = new_defaults,
+            source = None):
+    return app_common.bundle (handler, isps, defaults, source)
 
 def send (handler, data = None, key = None):
     isps = new_isps
     defaults = new_defaults
     
     ver = handler.request.get ('v', default_value = None)
-    
     if ver is None or ver == '0':
        agent = handler.request.headers ['User-Agent']
        if ver == '0' or agent.startswith ('steam-limiter/'):
            isps = old_isps.isps
            defaults = old_defaults
-        
+
+    alt_addr = handler.request.get ('ip', default_value = None)
     if not data:
-        data = bundle (handler, isps, defaults)
+        data = bundle (handler, isps, defaults, alt_addr)
+
     if key:
         data = data.get (key)
     app_common.send (handler, data)

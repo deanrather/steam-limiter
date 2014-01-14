@@ -151,8 +151,9 @@ def send (handler, data):
 # All the data we care about, all in a dict, for various handlers to choose
 # from to render
 
-def bundle (self, isps, defaults):
-    source = self.request.get ('ip', self.request.remote_addr)
+def bundle (self, isps, defaults, source = None):
+    if not source:
+        source = self.request.get ('ip', self.request.remote_addr)
     netblock = find_netblock (source)
 
     # GAE actually includes a small amount of GeoIP itself; not what need for

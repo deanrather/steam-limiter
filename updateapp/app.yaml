@@ -1,5 +1,5 @@
 application: steam-limiter
-version: 2
+version: 3
 runtime: python27
 threadsafe: true
 api_version: 1
@@ -14,6 +14,18 @@ libraries:
   version: latest 
 
 handlers:
+- url: /get.*
+  static_files: files/steamlimit-0.7.1.0.exe
+  upload: files/.*
+  mime_type: application/octet-stream
+  expiration: "14d"
+  http_headers:
+    Content-Disposition: attachment; filename="steam-limiter.exe"
+
+- url: /files
+  static_dir: files
+  mime_type: application/x-binary
+
 - url: /favicon\.ico
   static_files: favicon.ico
   upload: favicon\.ico

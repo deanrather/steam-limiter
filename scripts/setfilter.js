@@ -155,6 +155,8 @@ function fromJson (text) {
 
 function download (url, path) {
     var getFile = simpleGet (url);
+    if (! getFile || getFile.status != 200)
+        return false;
 
     var stream = WScript.CreateObject ("ADODB.Stream");
     var typeBinary = 1
@@ -164,6 +166,8 @@ function download (url, path) {
 
     var overwrite = 2
     stream.SaveToFile (path, overwrite);
+
+    return true;
 }
 
 /**
@@ -230,7 +234,7 @@ if (hasArg ("debug")) {
      * Point at an alternate version of the webservice for testing.
      */
 
-    base = "http://2.steam-limiter.appspot.com/";
+    base = "http://3.steam-limiter.appspot.com/";
 }
 
 if (xhr == undefined)
@@ -265,14 +269,17 @@ if (hasArg ("upload")) {
  * poke at it by hand), but for now it's better to grab it all in one go.
  */
 
-var getData = simpleGet ("all?cb");
+var getData = simpleGet ("all?cb&v=1");
+if (! getData || getData.status != 200)
+    WScript.Quit (4)
+
 var response = (getData && getData.responseText) || "null";
 var bundle = fromJson (response);
 
 if (hasArg ("show"))
     WScript.Echo (response);
 
-if (! bundle || ! bundle.latest || ! bundle.filterip)
+if (! bundle || ! bundle.latest)
     WScript.Quit (2);
 
 /*
@@ -293,14 +300,23 @@ if (hasArg ("upgrade")) {
      * Before downloading the update package, verify that it's coming
      * from a Google Code URL; this costs some future flexibility but
      * it's just a safer thing to do.
+     *
+     * Since Google Code downloads are going away, also be prepared to
+     * allow appspot downloads
      */
 
-    if (! /^http:\/\/.*\.googlecode\.com\//.test (bundle.download))
+    if (! /^http:\/\/.*\.googlecode\.com\//.test (bundle.download) &&
+        ! /^http:\/\/.*steam-limiter\.appspot\.com\//.test (bundle.download) &&
+        ! /^http:\/\/localhost:8080\//.test (bundle.download)) {
+
+	/* forbid the download */
         WScript.Quit (3);
+    }
 
     var path = "%TEMP%\\package.exe";
     path = shell.ExpandEnvironmentStrings (path);
-    download (bundle.download, path);
+    if (! download (bundle.download, path))
+        WScript.Quit (5);
 
     /*
      * Run the downloaded package silently to upgrade.

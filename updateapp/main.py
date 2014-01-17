@@ -125,9 +125,9 @@ new_isps = {
     # regional peering exchanges, and that's it (no proxy servers).
     
     14: { 'name': 'iPrimus Australia',
-          'filter': 'content*.steampowered.com=valve217.cs.steampowered.com;' +
+          'filter': 'content*.steampowered.com=steam.ix.asn.au,steam01.qld.ix.asn.au,steam01.vic.ix.asn.au;' +
                     '*.cs.steampowered.com=valve217.cs.steampowered.com',
-          'allow': '//*.steampowered.com=*' },
+          'allow': '//*.ix.asn.au=*;//*.steampowered.com=*' },
 
     # Similarly to iPrimus, these small regional ISPs don't document what they
     # do and some of this data may be out of data due to acquisitions, since the

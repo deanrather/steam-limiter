@@ -142,9 +142,10 @@ isps = {
     # of the old Steam servers are now completely gone.
 
     14: { 'name': 'iPrimus Australia', 'server': '0.0.0.0',
-          'filter': '*:27030=49.143.234.14,files-oc-syd.games.on.net;' +
-                    'content*.steampowered.com=49.143.234.14,files-oc-syd.games.on.net',
-          'allow': '//steam.cdn.on.net=*' },
+          'filter': '*:27030=49.143.234.14;' +
+                    'content*.steampowered.com=steam.ix.asn.au,steam01.qld.ix.asn.au,steam01.vic.ix.asn.au;' +
+                    '*.cs.steampowered.com=valve217.cs.steampowered.com',
+          'allow': '//*.ix.asn.au=*;//*.steampowered.com=*' },
 
     # As with iPrimus since many of the old Steam servers listed as unmetered
     # are now no longer active, try using the current Internode rules

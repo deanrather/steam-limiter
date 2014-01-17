@@ -51,7 +51,7 @@ ipv6_prefixes = {
 # server IPs used by different ISPs to see if we can identify their netblocks.
 
 def find_netblock (ip):
-    if ip == '127.0.0.1':
+    if ip == '127.0.0.1' or ip == "::1":
         ip = '203.167.129.4'
 
     ipType = type (ip)
@@ -205,4 +205,5 @@ def bundle (self, isps, defaults, source = None):
     if test:
         result ['test'] = test
 
+    logging.info (json.dumps (result))
     return result

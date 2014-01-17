@@ -64,8 +64,8 @@ if 'Development' in os.environ ['SERVER_SOFTWARE']:
     self_base = 'http://localhost:8080'
 
 old_defaults = {
-    'latest': '0.7.0.3',
-    'download': 'http://steam-limiter.googlecode.com/files/steamlimit-0.7.0.3.exe'
+    'latest': '0.7.1.0',
+    'download': 'http://steam-limiter.googlecode.com/files/steamlimit-0.7.1.0.exe'
 }
 
 new_defaults = {
@@ -243,13 +243,24 @@ def bundle (handler, isps = new_isps, defaults = new_defaults,
 def send (handler, data = None, key = None):
     isps = new_isps
     defaults = new_defaults
-    
+
+    # Decide what rules to serve. If I want to get fancy, I can
+    # parse out the steam-limiter version from the User-Agent
+    # header. For now, I just use it to sniff the difference
+    # between normal browser visits and update tests, and have
+    # the newer versions of stream-limiter explicitly request
+    # a "v" rather than having me try and parse/sniff the string
+    # version they pass in the user agent string.
+
     ver = handler.request.get ('v', default_value = None)
     if ver is None or ver == '0':
        agent = handler.request.headers ['User-Agent']
        if ver == '0' or agent.startswith ('steam-limiter/'):
            isps = old_isps.isps
            defaults = old_defaults
+
+    # Allow manually forcing an IP to override the source host,
+    # for testing purposes.
 
     alt_addr = handler.request.get ('ip', default_value = None)
     if not data:

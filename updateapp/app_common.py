@@ -165,6 +165,9 @@ def bundle (self, isps, defaults, source = None):
     country = country or 'Unknown'
 
     isp = isps.get (netblock)
+    if isp is None:
+        isp = isps.get (- 1)
+
     proxy = isp.get ('proxy')
 
     result = defaults.copy ()
@@ -190,7 +193,15 @@ def bundle (self, isps, defaults, source = None):
     if 'proxyallow' in isp:
         proxyallow = isp ['proxyallow']
 
-    result ['ispname'] = isp ['name']
+    # the 'filterip' element is deprecated and not used since the port 27030 download
+    # system has gone away, but there needs to be some content in there otherwise the
+    # update script for versions prior to 0.7.1.0 will reject the configuration.
+    #
+    # From 0.7.1.0 the update script doesn't check to see that element exists, and
+    # the isp configuration dict won't contain a field for it.
+
+    result ['filterip'] = isp.get ('server')
+    result ['ispname'] = isp.get ('name')
     result ['country'] = country
 
     if proxy and proxyfilter and proxyallow:
